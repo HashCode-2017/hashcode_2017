@@ -3,17 +3,20 @@
 Team: **Kacem, Daniel, Marouan, Dhia**
 
 Files in this solution:
-- [`solution.py`](./solution.py) — parser, solver, output writer, and scorer.
+- [`solution.py`](./solution.py) — parser, both solvers, validator, output writer, and scorer.
+- [`tests/test_solution.py`](./tests/test_solution.py) — test suite, anchored on the score the
+  problem statement computes by hand.
+- [`bench.py`](./bench.py) — instance generator and strategy comparison.
 - [`example.in`](./example.in) — the worked example from the problem statement (transcribed
   verbatim), used to sanity-check the code.
 
 Run it with:
 
 ```
-python solution.py <input_file> <output_file>
+python solution.py <input_file> <output_file> [--strategy best-first|rounds]
 ```
 
-It prints the achieved score and writes a valid submission file.
+It validates the placement, writes a valid submission file, and prints the achieved score.
 
 ---
 
@@ -50,55 +53,86 @@ that is:
 That ruled out ILP/LP relaxation and full DP knapsack, and pointed us at a **greedy heuristic**
 — the standard, well-known approach for this exact Hash Code problem.
 
-## 3. The algorithm: iterative greedy by savings-density
+## 3. The algorithm: greedy by savings-density
 
 **Idea.** For a given cache, the "value" of storing video `v` is the total latency it would
 save across all requests for `v` from endpoints connected to that cache — but only counting
 the part of the latency that isn't *already* being saved by a cheaper option. We rank
-candidate videos per cache by **value per megabyte** (a knapsack ratio) and greedily fill each
-cache. Since placing a video in one cache can reduce the marginal value of placing it in
-another (an endpoint might already reach it faster elsewhere), we repeat this over several
-rounds, refreshing "the best latency currently achievable" after every placement.
+candidates by **value per megabyte** (a knapsack ratio) and greedily place them, refreshing
+"the best latency currently achievable" after every placement, since putting a video in one
+cache reduces the marginal value of putting it in another.
 
-**Precompute once:**
+The question that separates a decent implementation from a good one is *in what order* you
+spend capacity. We implemented both answers; `solution.py` keeps both behind `--strategy`
+so the comparison stays reproducible.
+
+### 3a. `--strategy rounds` — per-cache, index order (our first version)
+
+Walk caches `0..C-1`, greedily filling each from its own ranked candidate list, and repeat
+for a few rounds until a full pass places nothing new.
+
+This is simple and fast, but it has a structural bias: **cache 0 always picks first**. When
+two caches serve the same endpoint, the video lands in whichever has the *lower index*, not
+whichever *saves more* — the low-numbered cache spends its capacity on a video that a better
+cache should have held.
+
+### 3b. `--strategy best-first` — global order, lazily re-evaluated (default)
+
+Rank every `(cache, video)` candidate against each other in one global priority queue rather
+than per cache, and always spend capacity on the best remaining candidate in the whole
+instance.
+
+Recomputing every gain after every placement would be far too slow, so we re-evaluate
+**lazily**. The key observation is that gains are **monotone non-increasing**: placing a
+video anywhere can only ever *lower* what's left to save elsewhere (an endpoint that now
+reaches a video faster has less remaining benefit), never raise it. So a candidate popped
+off the heap needs only its own gain recomputed — if that fresh value still beats the next
+entry in the heap, it genuinely is the global best and can be placed immediately; otherwise
+it is pushed back at its true density and we pop again. Stale entries therefore cost a
+re-queue, not a full rebuild.
+
+Two cheap prunes matter: a video larger than the cache capacity is never a candidate at all,
+and because remaining capacity only ever shrinks, a candidate that doesn't fit *now* can be
+dropped outright rather than re-queued.
+
+In pseudocode:
+
+```
+heap = []                                  # max-heap on gain/size
+for c in caches:
+    gains = {}                             # video -> savings if placed in c
+    for (e, lat_c) in cache_endpoints[c]:
+        if lat_c >= L_D[e]: continue       # cache no better than the data centre here
+        for (v, n) in endpoint_requests[e]:
+            if size[v] <= capacity:
+                gains[v] += n * (L_D[e] - lat_c)
+    for v, g in gains: push(heap, (-g/size[v], c, v))
+
+while heap:
+    (_, c, v) = pop(heap)
+    if size[v] > remaining[c] or v in placed[c]: continue   # can never fit; drop
+    g = gain(c, v)                                          # recompute, fresh
+    if g <= 0: continue
+    if heap and g/size[v] < -heap[0][0]:                    # stale -> requeue
+        push(heap, (-g/size[v], c, v)); continue
+    place v in c; remaining[c] -= size[v]
+    update best_latency[e][v] for endpoints of c that request v
+```
+
+**Precompute once** (in `Instance`, so neither solver re-scans the raw request list):
 - `endpoint_requests[e][v]` — aggregated request count for video `v` from endpoint `e`.
-- `cache_endpoints[c]` — list of `(endpoint, latency)` for endpoints connected to cache `c`.
-- `best_latency[e][v]` — initialized to the data-center latency `L_D[e]` for every endpoint.
+- `video_endpoints[v]` — the reverse index, `[(endpoint, count)]`. This is what makes
+  recomputing a *single* `gain(c, v)` cheap, and therefore what makes lazy evaluation
+  viable at all.
+- `cache_endpoints[c]` and `cache_latency[c][e]` — the endpoint↔cache latency map, as a
+  list to sweep and a dict for O(1) lookup.
 
-**Each round, for every cache `c` with spare capacity:**
-1. For every endpoint `e` connected to `c` and every video `v` it requests, compute the
-   marginal gain if `v` were added to `c`:
-   `gain(c, v) += requests(v, e) × max(0, best_latency[e][v] − latency(c, e))`
-2. Sort candidate videos by `gain / size`, descending.
-3. Walk the sorted list, placing each video that still fits in the cache's remaining
-   capacity (classic greedy knapsack fill).
-4. Immediately update `best_latency[e][v]` for every endpoint touched, so later caches in the
-   *same* round (and the next round) see the improvement.
-
-Rounds repeat until a full pass places nothing new, or a round cap is hit (bounds runtime on
-the largest inputs).
-
-```
-for round in 1..max_rounds:
-    changed = false
-    for c in caches with spare capacity:
-        gains = {}                         # video -> marginal savings if placed in c
-        for (e, lat_c) in cache_endpoints[c]:
-            for (v, n) in endpoint_requests[e]:
-                if v not in placed[c] and lat_c < best_latency[e][v]:
-                    gains[v] += n * (best_latency[e][v] - lat_c)
-        for v in sorted(gains, key = gains[v] / size[v], desc):
-            if size[v] <= remaining[c]:
-                place v in c; remaining[c] -= size[v]; changed = true
-                update best_latency[e][v] for touched endpoints
-    if not changed: break
-```
-
-**Complexity.** Each round costs roughly `O(Σc |cache_endpoints[c]| × avg videos/endpoint +
-Σc candidates·log(candidates))` — bounded by the total endpoint–cache connections and request
-rows rather than `V × C`, which is what keeps it tractable for `R` up to 1,000,000. A handful
-of rounds (we default to 5) is enough to converge in practice, since gains only ever shrink
-round over round.
+**Complexity.** Building the heap costs `O(Σc |cache_endpoints[c]| × avg videos/endpoint)`,
+i.e. bounded by the real endpoint–cache connections and request rows rather than `V × C` —
+the same bound as one round of 3a, and what keeps it tractable for `R` up to 1,000,000.
+Each placement then costs `O(|video_endpoints[v]| + log H)` plus however many stale re-queues
+the heap needs. Only videos actually *requested* by a connected endpoint are ever considered,
+so the work tracks real demand rather than worst-case combinatorics.
 
 ## 4. Validating it
 
@@ -122,6 +156,48 @@ Score: 562500
 i.e. our heuristic beats the statement's own illustrative example, which is exactly the
 sanity check we wanted: the scorer is correct, and the solver genuinely optimizes rather than
 just reproducing the example.
+
+### Test suite
+
+`tests/test_solution.py` (47 tests, run with `python -m pytest tests/`) pins that anchor
+number and covers the edge cases we found while reading the spec: endpoints with `K = 0`, a
+video too big for any cache (video 4, 110MB against 100MB), duplicate request rows for the
+same `(video, endpoint)` pair that must *sum* rather than overwrite, truncated input, and
+whitespace variation (CRLF, blank lines, leading/trailing newlines). Both strategies are run
+against randomised instances and checked for validity and non-negative score.
+
+One test earned its keep immediately: `validate()` originally summed `sizes[v]` before
+range-checking `v`, so an out-of-range video id crashed with `IndexError` instead of
+reporting itself. Caught and fixed.
+
+### Does best-first actually beat rounds?
+
+The official data sets aren't redistributed with the PDF, so claiming an improvement on the
+worked 5-video example would be meaningless — both strategies score `562500` there, because
+the instance is too small to contain the decision that separates them. `bench.py` instead
+generates instances shaped like the real ones — Zipf-distributed video popularity, endpoints
+wired to several *overlapping* caches, which is precisely the case 3a resolves badly — and
+scores both strategies on each:
+
+| scale | V | E | C | R | `rounds` | `best-first` | delta |
+|---|---|---|---|---|---|---|---|
+| small | 200 | 50 | 20 | ~2.4k | 632,242 | 660,758 | **+4.51%** |
+| mid | 2,000 | 200 | 100 | ~48k | 319,637 | 337,160 | **+5.48%** |
+| big | 10,000 | 1,000 | 1,000 | ~512k | 238,794 | 252,661 | **+5.81%** |
+
+Best-first won on every individual seed, not just on the mean. It does cost runtime — at the
+largest size roughly 20s against 6s, from heap churn as stale candidates are re-queued. With
+hours on the contest clock that's an easy trade, so it's the default; `--strategy rounds`
+stays available for when a fast answer matters more than the last 5%.
+
+### Parser
+
+The parser was rewritten from line-by-line to a single whitespace token stream. That was done
+for **correctness** — the old version split on `"\n"` only, so one stray blank line shifted
+every subsequent field and silently produced a wrong instance rather than an error. Bulk-
+converting the request block with `map(int, ...)` made it **1.8× faster** as a side effect
+(0.72s vs 1.30s on a 1,000,000-row, 13MB input), and it was checked to parse field-for-field
+identically to the original.
 
 ## 5. Team division of work
 
@@ -180,8 +256,17 @@ doing their jobs correctly.
 
 ## 7. Possible next steps (not implemented here)
 
-For the full-scale official data sets (not included with this PDF — only the worked example
-was), we'd want to: vectorize the gain computation with `numpy` for very large `R`; try a
-few different cache-processing orders per round (e.g., emptiest cache first) since order
-affects the single-pass greedy fill; and add a light local-search pass (swap one placed video
-for an unplaced one) once the greedy converges, to recover a bit more score cheaply.
+Cache-processing order turned out to matter most, so that one got built: it's section 3b,
+worth roughly +5% over index order. What's still on the list:
+
+- **Local search.** Once the greedy converges, try swapping one placed video for an unplaced
+  one and keep the swap if the score improves. Greedy-by-density is known to leave a few
+  percent on the table in exactly this way, and a swap pass is cheap to bound by a time limit.
+- **Eviction, not just insertion.** Neither strategy ever removes a video. Allowing a cache
+  to drop a video that has since become redundant (because a better cache picked it up) would
+  free capacity that's currently stranded.
+- **Taming the heap churn.** Best-first spends most of its extra runtime re-queuing stale
+  candidates. Batching placements that provably can't interact — candidates on caches sharing
+  no endpoint — would cut that without changing the result.
+- **`numpy` for the gain sweep** if `R` ever became the bottleneck; on the sizes measured
+  above it isn't, so this stayed unbuilt rather than being added speculatively.

@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Solver output (regenerate with: python solution.py <input> <output>)
+output.txt
+*.sub
