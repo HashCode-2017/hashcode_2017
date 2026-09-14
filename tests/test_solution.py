@@ -189,6 +189,31 @@ def test_random_instances_produce_valid_non_negative_solutions(seed, tmp_path):
         assert solution.score(inst, placed) >= 0
 
 
+@pytest.mark.parametrize("scale", ["small", "mid"])
+def test_generated_input_round_trips_through_a_file(scale, tmp_path):
+    """generate -> write_input -> parse_input must give back the same data.
+
+    This is the cross-check between the writer and the parser: if either
+    drifts from the official format, the two stop agreeing.
+    """
+    import bench
+
+    original = bench.generate(random.Random(7), **bench.SCALES[scale])
+    path = tmp_path / f"{scale}.in"
+    bench.write_input(original, path)
+
+    reparsed = solution.parse_input(path)
+
+    assert (reparsed.V, reparsed.E, reparsed.R, reparsed.C, reparsed.X) == \
+           (original.V, original.E, original.R, original.C, original.X)
+    assert reparsed.sizes == original.sizes
+    assert reparsed.endpoint_latency == original.endpoint_latency
+    assert reparsed.endpoint_caches == original.endpoint_caches
+    assert reparsed.requests == original.requests
+    # And it must actually be solvable end to end.
+    assert solution.validate(reparsed, solution.solve_best_first(reparsed))
+
+
 @pytest.mark.parametrize("seed", range(12))
 def test_best_first_is_never_worse_than_doing_nothing(seed, tmp_path):
     rng = random.Random(seed)

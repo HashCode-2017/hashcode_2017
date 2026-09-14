@@ -67,6 +67,26 @@ def generate(rng, V, E, C, X, target_R):
                              endpoint_latency, endpoint_caches, requests)
 
 
+def write_input(inst, path):
+    """Serialise an Instance back out in the official input format.
+
+    The inverse of `solution.parse_input`, so a generated instance can be
+    saved as a real `.in` file and fed to the solver from the command line.
+    """
+    with open(path, "w", encoding="ascii", newline="\n") as f:
+        f.write(f"{inst.V} {inst.E} {inst.R} {inst.C} {inst.X}\n")
+        f.write(" ".join(map(str, inst.sizes)) + "\n")
+        for e in range(inst.E):
+            caches = inst.endpoint_caches[e]
+            f.write(f"{inst.endpoint_latency[e]} {len(caches)}\n")
+            for c, lat in caches.items():
+                f.write(f"{c} {lat}\n")
+        # One join beats a million small writes on the largest data sets.
+        if inst.requests:
+            f.write("\n".join(f"{v} {e} {n}" for v, e, n in inst.requests))
+            f.write("\n")
+
+
 def run(strategy, inst):
     start = time.perf_counter()
     if strategy == "rounds":
@@ -83,9 +103,21 @@ def main():
     ap.add_argument("--scale", choices=sorted(SCALES), default="mid")
     ap.add_argument("--trials", type=int, default=5)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--write", metavar="PATH",
+                    help="write one generated data set to PATH as a .in file "
+                         "and exit, instead of running the comparison")
     args = ap.parse_args()
 
     shape = SCALES[args.scale]
+
+    if args.write:
+        inst = generate(random.Random(args.seed), **shape)
+        write_input(inst, args.write)
+        size_mb = Path(args.write).stat().st_size / 1024 / 1024
+        print(f"wrote {args.write}  ({size_mb:.1f} MB)")
+        print(f"  V={inst.V} E={inst.E} C={inst.C} X={inst.X} R={inst.R}  "
+              f"seed={args.seed}")
+        return
     print(f"scale={args.scale} {shape}")
     print(f"{'seed':>5} {'rounds':>12} {'best-first':>12} {'delta':>9} "
           f"{'t_rounds':>9} {'t_bf':>9}")
