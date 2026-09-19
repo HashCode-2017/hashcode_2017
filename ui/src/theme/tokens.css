@@ -1,0 +1,51 @@
+/* Mission-control palette.
+ *
+ * The two data hues (amber = served from the datacenter / the cost we are
+ * paying; cyan = served from a cache / the saving) were validated with the
+ * dataviz palette checker against the dark-mode lightness band: all six
+ * checks pass, worst adjacent CVD delta-E 20.3 (protan). Do not hand-tweak the
+ * `-base` steps -- they are the validated data-mark colours. The `-bright`
+ * steps are UI signal only (glow, hover, focus), never a chart fill.
+ */
+:root {
+  --bg:        #07080A;
+  --panel:     #0E1013;
+  --panel-2:   #141619;
+  --panel-3:   #1B1E22;
+  --line:      rgba(255, 255, 255, 0.075);
+  --line-2:    rgba(255, 255, 255, 0.16);
+
+  --ink-0: #FCFCFC;
+  --ink-1: #BEBEBE;
+  --ink-2: #868686;
+  --ink-3: #5D5D5D;
+  --ink-4: #3D3D3D;
+
+  /* datacenter / cost / cold */
+  --dc:        #C68603;
+  --dc-bright: #FCAB03;
+  --dc-dim:    #684502;
+  /* cache / saving / hot */
+  --ca:        #07A6C4;
+  --ca-bright: #0DD3F8;
+  --ca-dim:    #025767;
+  /* reserved: constraint violations only */
+  --alert:        #FF0673;
+  --alert-bright: #FF9CB1;
+
+  /* sequential ramps, one hue, monotonic lightness */
+  --seq-0: #01343F; --seq-1: #014B59; --seq-2: #046375; --seq-3: #037C92;
+  --seq-4: #0196B1; --seq-5: #08B1D0; --seq-6: #04CCF0;
+  --amb-0: #402801; --amb-1: #5B3B02; --amb-2: #774F03; --amb-3: #956300;
+  --amb-4: #B37902; --amb-5: #D38F04; --amb-6: #F3A608;
+
+  --mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: 'Inter Variable', system-ui, -apple-system, Segoe UI, sans-serif;
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-in: cubic-bezier(0.55, 0.06, 0.68, 0.19);
+
+  --rail: 210px;
+  --tele: 300px;
+  --bar: 46px;
+}

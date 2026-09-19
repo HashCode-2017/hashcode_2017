@@ -6,6 +6,10 @@ Files in this solution:
 - [`solution.py`](./solution.py) — parser, solver, output writer, and scorer.
 - [`example.in`](./example.in) — the worked example from the problem statement (transcribed
   verbatim), used to sanity-check the code.
+- [`api/`](./api) + [`ui/`](./ui) — a web console that visualises a run from input file to
+  scored submission; see [DEMO.md](./DEMO.md). `solve()` takes an optional `on_event`
+  callback so the console can observe the search; it is purely observational and the
+  placement is identical with or without it.
 
 Run it with:
 
