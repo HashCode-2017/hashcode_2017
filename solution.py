@@ -76,10 +76,43 @@ def parse_input(path):
     return Instance(V, E, R, C, X, sizes, endpoint_latency, endpoint_caches, requests)
 
 
-def solve(inst: Instance, max_rounds: int = 5):
+TOP_CANDIDATES = 12
+
+
+def _endpoint_latency_snapshot(inst: "Instance", current_best):
+    """Demand-weighted average achieved latency for every endpoint.
+
+    Emitted once per round (not per placement) so an observer can animate
+    per-endpoint improvement without the solver having to report every single
+    latency update -- on the largest data set those number in the millions,
+    while this snapshot is only E values wide.
+    """
+    snapshot = []
+    for e in range(inst.E):
+        L_D = inst.endpoint_latency[e]
+        demand = inst.endpoint_requests.get(e)
+        best_here = current_best.get(e)
+        total_n = 0
+        weighted = 0
+        if demand:
+            for v, n in demand.items():
+                lat = best_here.get(v, L_D) if best_here else L_D
+                total_n += n
+                weighted += n * lat
+        snapshot.append(round(weighted / total_n, 2) if total_n else float(L_D))
+    return snapshot
+
+
+def solve(inst: Instance, max_rounds: int = 5, on_event=None):
     """
     Iterative greedy by savings-density (see SOLUTION.md for the full
     write-up of the approach).
+
+    `on_event(kind, payload)` is an optional, purely observational callback
+    invoked at the natural checkpoints of the search -- round boundaries,
+    cache scans and placements. The search behaves identically whether or not
+    it is supplied; it exists so the demo console in `api/` can visualise a
+    run as it happens. See DEMO.md.
 
     Returns: dict cache_id -> set of video ids stored there.
     """
@@ -94,10 +127,28 @@ def solve(inst: Instance, max_rounds: int = 5):
     def best_latency(e, v):
         return current_best[e].get(v, inst.endpoint_latency[e])
 
+    # An observer wants to watch endpoint latency fall as the caches fill, but
+    # reporting every individual (endpoint, video) improvement means millions
+    # of events on the largest data set. Sampling the whole endpoint vector a
+    # handful of times per round costs E floats per sample and is enough to
+    # animate smoothly.
+    snap_every = max(1, inst.C // 10)
+
     for _round in range(max_rounds):
         placed_this_round = False
+        round_placements = 0
+        round_gain = 0
+
+        if on_event:
+            on_event("round_start", {"round": _round})
 
         for c in range(inst.C):
+            if on_event and c and c % snap_every == 0:
+                on_event("progress", {
+                    "round": _round,
+                    "cache": c,
+                    "endpoint_latency": _endpoint_latency_snapshot(inst, current_best),
+                })
             if remaining_capacity[c] <= 0:
                 continue
             endpoints = inst.cache_endpoints.get(c)
@@ -126,6 +177,20 @@ def solve(inst: Instance, max_rounds: int = 5):
                 reverse=True,
             )
 
+            if on_event:
+                on_event("cache_scan", {
+                    "round": _round,
+                    "cache": c,
+                    "candidates": len(candidates),
+                    "remaining": remaining_capacity[c],
+                    # Only the head of the ranking -- that is what makes the
+                    # gain-per-megabyte rule legible; the tail never fits.
+                    "top": [
+                        {"video": v, "gain": g, "size": inst.sizes[v]}
+                        for v, g in candidates[:TOP_CANDIDATES]
+                    ],
+                })
+
             for v, gain in candidates:
                 if gain <= 0:
                     continue
@@ -134,12 +199,34 @@ def solve(inst: Instance, max_rounds: int = 5):
                     placed[c].add(v)
                     remaining_capacity[c] -= size
                     placed_this_round = True
+                    round_placements += 1
+                    round_gain += gain
                     # Update current_best immediately so later caches in
                     # this same round (and the next round) see the
                     # improved latency for this (endpoint, video) pair.
+                    improved = 0
                     for e, lat_c in endpoints:
                         if v in inst.endpoint_requests[e] and lat_c < best_latency(e, v):
                             current_best[e][v] = lat_c
+                            improved += 1
+                    if on_event:
+                        on_event("place", {
+                            "round": _round,
+                            "cache": c,
+                            "video": v,
+                            "size": size,
+                            "gain": gain,
+                            "remaining": remaining_capacity[c],
+                            "endpoints_improved": improved,
+                        })
+
+        if on_event:
+            on_event("round_end", {
+                "round": _round,
+                "placements": round_placements,
+                "gain": round_gain,
+                "endpoint_latency": _endpoint_latency_snapshot(inst, current_best),
+            })
 
         if not placed_this_round:
             break
