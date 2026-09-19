@@ -1,0 +1,73 @@
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+@import './tokens.css';
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink-1);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* Every numeral in this app is tabular: columns of figures must align, and a
+ * counter animating from 0 to 960,494 must not reflow while it runs. */
+.mono, input, table, .num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'zero' 1;
+}
+
+.lbl {
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.hair { border: 0; border-top: 1px solid var(--line); margin: 0; }
+
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:disabled { cursor: default; opacity: 0.35; }
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--panel-3); }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
+
+::selection { background: var(--ca-dim); color: var(--ink-0); }
+
+/* The room texture: a hairline grid and a faint grain, both inert to pointers.
+ * No scanlines -- this should read as an instrument, not a prop. */
+/* z-index 0: these sit BEHIND the panels. They are fixed-position children of
+ * the app's stacking context, so without this they would paint over every
+ * sibling that has no z-index of its own. */
+.chrome-grid {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image:
+    repeating-linear-gradient(to right,  rgba(255,255,255,0.022) 0 1px, transparent 1px 64px),
+    repeating-linear-gradient(to bottom, rgba(255,255,255,0.022) 0 1px, transparent 1px 64px);
+}
+.chrome-grain {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  opacity: 0.07; mix-blend-mode: overlay;
+}
+.chrome-vig {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(ellipse 96% 88% at 50% 45%, transparent 62%, rgba(0,0,0,0.42) 100%);
+}
+
+/* Everything that carries content sits above the texture. */
+.layer { position: relative; z-index: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
