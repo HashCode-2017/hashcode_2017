@@ -5,3 +5,6 @@ ui/node_modules/
 ui/dist/
 __pycache__/
 ui/tsconfig.tsbuildinfo
+*.pptx
+*.pdf
+*.txt
