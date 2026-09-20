@@ -1,2 +1,3 @@
-speech.txt
-instances.zip
+*.txt
+*.zip
+*.pyc

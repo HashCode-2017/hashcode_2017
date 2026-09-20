@@ -76,20 +76,60 @@ def parse_input(path):
     return Instance(V, E, R, C, X, sizes, endpoint_latency, endpoint_caches, requests)
 
 
-def solve(inst: Instance, max_rounds: int = 5):
-    """
-    Iterative greedy by savings-density (see SOLUTION.md for the full
-    write-up of the approach).
-
-    Returns: dict cache_id -> set of video ids stored there.
-    """
-    placed = defaultdict(set)                        # cache -> {video ids}
-    remaining_capacity = {c: inst.X for c in range(inst.C)}
-
-    # current_best[e][v] = latency currently achievable for (endpoint e,
-    # video v), defaulting to the datacenter latency until a cheaper cache
-    # gets assigned that video.
+def _build_current_best(inst, placed):
+    """best achievable latency per (endpoint, video) for a given placement."""
     current_best = defaultdict(dict)
+    for e, caches in inst.endpoint_caches.items():
+        requested = inst.endpoint_requests[e]
+        for c, lat in caches.items():
+            for v in placed.get(c, ()):
+                if v in requested and lat < current_best[e].get(v, inst.endpoint_latency[e]):
+                    current_best[e][v] = lat
+    return current_best
+
+
+def evict_dead_weight(inst, placed):
+    """
+    (cache, video) pairs whose removal provably cannot change the score.
+
+    A copy is dead weight when, at every endpoint that cache serves which
+    requests the video, another holder (or the data center) is already at
+    least as fast. Candidates are checked against a running set, so two
+    caches redundant only with respect to each other never both get dropped.
+    """
+    holders = defaultdict(dict)                      # (endpoint, video) -> {cache: latency}
+    for c, videos in placed.items():
+        for e, lat in inst.cache_endpoints[c]:
+            requested = inst.endpoint_requests[e]
+            for v in videos:
+                if v in requested:
+                    holders[(e, v)][c] = lat
+
+    evictions = []
+    for c in sorted(placed):
+        for v in sorted(placed[c]):
+            dominated = True
+            served = []
+            for e, lat_c in inst.cache_endpoints[c]:
+                if v not in inst.endpoint_requests[e]:
+                    continue
+                best_without = inst.endpoint_latency[e]
+                for other, lat in holders[(e, v)].items():
+                    if other != c and lat < best_without:
+                        best_without = lat
+                if best_without > lat_c:
+                    dominated = False
+                    break
+                served.append((e, v))
+            if dominated:
+                evictions.append((c, v))
+                for key in served:
+                    holders[key].pop(c, None)
+    return evictions
+
+
+def _greedy_fill(inst, placed, remaining_capacity, current_best, max_rounds):
+    """Iterative greedy by savings-density, resumed from whatever is placed."""
 
     def best_latency(e, v):
         return current_best[e].get(v, inst.endpoint_latency[e])
@@ -144,6 +184,33 @@ def solve(inst: Instance, max_rounds: int = 5):
         if not placed_this_round:
             break
 
+
+def solve(inst: Instance, max_rounds: int = 5, evict: bool = True):
+    """
+    Iterative greedy by savings-density, followed by one eviction/refill
+    cycle (see SOLUTION.md for the full write-up of the approach).
+
+    Returns: dict cache_id -> set of video ids stored there.
+    """
+    placed = defaultdict(set)                        # cache -> {video ids}
+    remaining_capacity = {c: inst.X for c in range(inst.C)}
+
+    # current_best[e][v] = latency currently achievable for (endpoint e,
+    # video v), defaulting to the datacenter latency until a cheaper cache
+    # gets assigned that video.
+    current_best = defaultdict(dict)
+
+    _greedy_fill(inst, placed, remaining_capacity, current_best, max_rounds)
+
+    if evict:
+        evictions = evict_dead_weight(inst, placed)
+        if evictions:
+            for c, v in evictions:
+                placed[c].discard(v)
+                remaining_capacity[c] += inst.sizes[v]
+            _greedy_fill(inst, placed, remaining_capacity,
+                         _build_current_best(inst, placed), max_rounds)
+
     return placed
 
 
@@ -181,10 +248,12 @@ def main():
     parser.add_argument("output_file")
     parser.add_argument("--rounds", type=int, default=5,
                          help="max refinement rounds for the greedy solver")
+    parser.add_argument("--no-evict", action="store_true",
+                         help="skip the dead-weight eviction and refill pass")
     args = parser.parse_args()
 
     inst = parse_input(args.input_file)
-    placed = solve(inst, max_rounds=args.rounds)
+    placed = solve(inst, max_rounds=args.rounds, evict=not args.no_evict)
     write_output(args.output_file, placed, inst.C)
     s = score(inst, placed)
     print(f"Videos: {inst.V}  Endpoints: {inst.E}  Caches: {inst.C}  Requests: {inst.R}")

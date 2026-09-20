@@ -78,6 +78,18 @@ rounds, refreshing "the best latency currently achievable" after every placement
 Rounds repeat until a full pass places nothing new, or a round cap is hit (bounds runtime on
 the largest inputs).
 
+**Then one eviction/refill cycle.** Because placements are never undone, a cache can end up
+holding a copy that a *later* placement made redundant: another cache now reaches every
+endpoint that wanted it at an equal or better latency. That copy saves nothing but still
+occupies megabytes. After the rounds converge we sweep for exactly those **dominated** copies,
+drop them, and run the greedy fill again over the freed space. The eviction criterion is
+conservative — a copy goes only if, at *every* endpoint the cache serves that requests the
+video, some other holder (or the data center) is already at least as fast — so the score after
+eviction is provably identical to before; all of the gain comes from the refill. Candidates are
+tested against a running set, so two caches that are redundant only with respect to each other
+never both get dropped. This runs by default; `--no-evict` reproduces the plain round-based
+behaviour described above.
+
 ```
 for round in 1..max_rounds:
     changed = false
@@ -180,8 +192,8 @@ doing their jobs correctly.
 
 ## 7. Possible next steps (not implemented here)
 
-For the full-scale official data sets (not included with this PDF — only the worked example
-was), we'd want to: vectorize the gain computation with `numpy` for very large `R`; try a
+We'd still want to: vectorize the gain computation with `numpy` for very large `R`; try a
 few different cache-processing orders per round (e.g., emptiest cache first) since order
-affects the single-pass greedy fill; and add a light local-search pass (swap one placed video
-for an unplaced one) once the greedy converges, to recover a bit more score cheaply.
+affects the single-pass greedy fill; and generalise the eviction pass into a full local
+search that also swaps *non*-dominated placements (today it only drops copies that provably
+save nothing), which is where the remaining fragmentation loss sits.
