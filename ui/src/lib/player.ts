@@ -92,6 +92,16 @@ export class Player {
         }
         break
       }
+      case 'evict': {
+        // A dominated copy is handed back. cumGain is deliberately untouched:
+        // gains are marginal, so the evicted copy's share was already absorbed
+        // by whichever placement superseded it.
+        const c = e.cache!
+        this.cacheUsed[c] -= e.size!
+        this.cacheVideos[c] -= 1
+        this.placed -= 1
+        break
+      }
       case 'progress':
       case 'round_end':
         if (e.endpoint_latency) this.epLatency = e.endpoint_latency
