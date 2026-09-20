@@ -82,6 +82,18 @@ rounds, refreshing "the best latency currently achievable" after every placement
 Rounds repeat until a full pass places nothing new, or a round cap is hit (bounds runtime on
 the largest inputs).
 
+**Then one eviction/refill cycle.** Because placements are never undone, a cache can end up
+holding a copy that a *later* placement made redundant: another cache now reaches every
+endpoint that wanted it at an equal or better latency. That copy saves nothing but still
+occupies megabytes. Once the rounds converge we sweep for exactly those **dominated** copies,
+drop them, and run the greedy fill again over the freed space. The criterion is deliberately
+conservative — a copy goes only if, at *every* endpoint the cache serves that requests the
+video, some other holder (or the data center) is already at least as fast — so the score
+immediately after eviction is provably identical to before, and all of the gain comes from
+the refill. Candidates are tested against a running set, so two caches that are redundant
+only with respect to each other never both get dropped. This runs by default; `--no-evict`
+reproduces the plain round-based behaviour described above.
+
 ```
 for round in 1..max_rounds:
     changed = false
@@ -182,10 +194,29 @@ it *beat* the statement's own (intentionally non-optimal) example — `562500` v
 the same tiny instance — was the confirmation that both halves (scoring and optimizing) were
 doing their jobs correctly.
 
-## 7. Possible next steps (not implemented here)
+## 7. What the eviction pass is worth
 
-For the full-scale official data sets (not included with this PDF — only the worked example
-was), we'd want to: vectorize the gain computation with `numpy` for very large `R`; try a
-few different cache-processing orders per round (e.g., emptiest cache first) since order
-affects the single-pass greedy fill; and add a light local-search pass (swap one placed video
-for an unplaced one) once the greedy converges, to recover a bit more score cheaply.
+Measured on the four official data sets, greedy alone vs. greedy + eviction/refill:
+
+| Instance | Endpoints per cache | Dead weight | Score | Gain |
+|---|---|---|---|---|
+| `me_at_the_zoo` | 3.2 | 68 MB (6.80%) | 487,725 → 492,110 | **+0.899%** |
+| `videos_worth_spreading` | 5.2 | 34,682 MB (3.47%) | 594,079 → 597,805 | **+0.627%** |
+| `kittens` | 704 | 1,382 MB (0.05%) | 960,494 → 960,628 | +0.014% |
+| `trending_today` | 100 (full mesh) | 0 MB (0.00%) | 499,966 → 499,966 | 0.000% |
+
+The score is bit-identical immediately after eviction on every instance, which is the check
+that the criterion only removes copies contributing nothing. How much there is to reclaim
+tracks **how many endpoints each cache serves**: a cache reaching 3 endpoints is easy for
+another to dominate across all of them, while one reaching 704 almost always keeps territory
+where it is uniquely fastest. `trending_today` is a full mesh (every cache reaches every
+endpoint), so nothing is ever dominated. The pass costs +0.4s on `videos_worth_spreading`
+and +54s on `kittens`.
+
+## 8. Possible next steps (not implemented here)
+
+Vectorize the gain computation with `numpy` for very large `R`; try a few different
+cache-processing orders per round (e.g., emptiest cache first) since order affects the
+single-pass greedy fill; and generalise the eviction pass into a full local search that also
+*swaps* non-dominated copies — today it only drops copies that provably save nothing, and the
+remaining fragmentation loss sits in the placements it will not touch.

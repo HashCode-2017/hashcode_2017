@@ -103,26 +103,68 @@ def _endpoint_latency_snapshot(inst: "Instance", current_best):
     return snapshot
 
 
-def solve(inst: Instance, max_rounds: int = 5, on_event=None):
-    """
-    Iterative greedy by savings-density (see SOLUTION.md for the full
-    write-up of the approach).
-
-    `on_event(kind, payload)` is an optional, purely observational callback
-    invoked at the natural checkpoints of the search -- round boundaries,
-    cache scans and placements. The search behaves identically whether or not
-    it is supplied; it exists so the demo console in `api/` can visualise a
-    run as it happens. See DEMO.md.
-
-    Returns: dict cache_id -> set of video ids stored there.
-    """
-    placed = defaultdict(set)                        # cache -> {video ids}
-    remaining_capacity = {c: inst.X for c in range(inst.C)}
-
-    # current_best[e][v] = latency currently achievable for (endpoint e,
-    # video v), defaulting to the datacenter latency until a cheaper cache
-    # gets assigned that video.
+def _build_current_best(inst: Instance, placed):
+    """Best achievable latency per (endpoint, video) for a given placement."""
     current_best = defaultdict(dict)
+    for e, caches in inst.endpoint_caches.items():
+        requested = inst.endpoint_requests[e]
+        for c, lat in caches.items():
+            for v in placed.get(c, ()):
+                if v in requested and lat < current_best[e].get(v, inst.endpoint_latency[e]):
+                    current_best[e][v] = lat
+    return current_best
+
+
+def evict_dead_weight(inst: Instance, placed):
+    """
+    (cache, video) pairs whose removal provably cannot change the score.
+
+    The rounds never undo a placement, so a cache can keep a copy that a later
+    placement made redundant: another holder now reaches every endpoint that
+    wanted it at an equal or better latency. Such a copy saves nothing yet
+    still occupies megabytes that a different video could use.
+
+    Candidates are tested against a running set, so two caches that are
+    redundant only with respect to each other never both get dropped.
+    """
+    holders = defaultdict(dict)                      # (endpoint, video) -> {cache: latency}
+    for c, videos in placed.items():
+        for e, lat in inst.cache_endpoints[c]:
+            requested = inst.endpoint_requests[e]
+            for v in videos:
+                if v in requested:
+                    holders[(e, v)][c] = lat
+
+    evictions = []
+    for c in sorted(placed):
+        for v in sorted(placed[c]):
+            dominated = True
+            served = []
+            for e, lat_c in inst.cache_endpoints[c]:
+                if v not in inst.endpoint_requests[e]:
+                    continue
+                best_without = inst.endpoint_latency[e]
+                for other, lat in holders[(e, v)].items():
+                    if other != c and lat < best_without:
+                        best_without = lat
+                if best_without > lat_c:
+                    dominated = False
+                    break
+                served.append((e, v))
+            if dominated:
+                evictions.append((c, v))
+                for key in served:
+                    holders[key].pop(c, None)
+    return evictions
+
+
+def _greedy_fill(inst: Instance, placed, remaining_capacity, current_best,
+                 max_rounds, on_event=None, round_offset=0):
+    """
+    Iterative greedy by savings-density, resumed from whatever is already
+    placed. Mutates `placed`, `remaining_capacity` and `current_best`;
+    returns the number of rounds it consumed.
+    """
 
     def best_latency(e, v):
         return current_best[e].get(v, inst.endpoint_latency[e])
@@ -133,8 +175,11 @@ def solve(inst: Instance, max_rounds: int = 5, on_event=None):
     # handful of times per round costs E floats per sample and is enough to
     # animate smoothly.
     snap_every = max(1, inst.C // 10)
+    rounds_used = 0
 
-    for _round in range(max_rounds):
+    for _pass in range(max_rounds):
+        _round = round_offset + _pass
+        rounds_used += 1
         placed_this_round = False
         round_placements = 0
         round_gain = 0
@@ -231,6 +276,57 @@ def solve(inst: Instance, max_rounds: int = 5, on_event=None):
         if not placed_this_round:
             break
 
+    return rounds_used
+
+
+def solve(inst: Instance, max_rounds: int = 5, on_event=None, evict: bool = True):
+    """
+    Iterative greedy by savings-density, then one eviction/refill cycle
+    (see SOLUTION.md for the full write-up of the approach).
+
+    `on_event(kind, payload)` is an optional, purely observational callback
+    invoked at the natural checkpoints of the search -- round boundaries,
+    cache scans, placements and evictions. The search behaves identically
+    whether or not it is supplied; it exists so the demo console in `api/`
+    can visualise a run as it happens. See DEMO.md.
+
+    `evict=False` stops after the rounds, reproducing the plain greedy
+    behaviour.
+
+    Returns: dict cache_id -> set of video ids stored there.
+    """
+    placed = defaultdict(set)                        # cache -> {video ids}
+    remaining_capacity = {c: inst.X for c in range(inst.C)}
+
+    # current_best[e][v] = latency currently achievable for (endpoint e,
+    # video v), defaulting to the datacenter latency until a cheaper cache
+    # gets assigned that video.
+    current_best = defaultdict(dict)
+
+    rounds_used = _greedy_fill(inst, placed, remaining_capacity, current_best,
+                               max_rounds, on_event)
+
+    if evict:
+        evictions = evict_dead_weight(inst, placed)
+        if evictions:
+            if on_event:
+                on_event("phase", {"phase": "evicting dominated copies"})
+            for c, v in evictions:
+                placed[c].discard(v)
+                remaining_capacity[c] += inst.sizes[v]
+                if on_event:
+                    on_event("evict", {
+                        "cache": c,
+                        "video": v,
+                        "size": inst.sizes[v],
+                        "remaining": remaining_capacity[c],
+                    })
+            # current_best is rebuilt rather than patched: the incremental
+            # table still records latencies that the evicted copies provided.
+            _greedy_fill(inst, placed, remaining_capacity,
+                         _build_current_best(inst, placed),
+                         max_rounds, on_event, round_offset=rounds_used)
+
     return placed
 
 
@@ -268,10 +364,12 @@ def main():
     parser.add_argument("output_file")
     parser.add_argument("--rounds", type=int, default=5,
                          help="max refinement rounds for the greedy solver")
+    parser.add_argument("--no-evict", action="store_true",
+                         help="skip the dead-weight eviction and refill pass")
     args = parser.parse_args()
 
     inst = parse_input(args.input_file)
-    placed = solve(inst, max_rounds=args.rounds)
+    placed = solve(inst, max_rounds=args.rounds, evict=not args.no_evict)
     write_output(args.output_file, placed, inst.C)
     s = score(inst, placed)
     print(f"Videos: {inst.V}  Endpoints: {inst.E}  Caches: {inst.C}  Requests: {inst.R}")
