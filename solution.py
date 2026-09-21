@@ -15,6 +15,7 @@ Usage:
 """
 
 import argparse
+import heapq
 from collections import defaultdict
 
 
@@ -268,7 +269,245 @@ def _greedy_fill(inst: Instance, placed, remaining_capacity, current_best,
     return total_placements
 
 
-def solve(inst: Instance, max_rounds: int = 5, on_event=None, evict: bool = True):
+def _global_fill(inst: Instance, placed, remaining_capacity, current_best,
+                 video_requests, on_event=None, round_no=0):
+    """
+    One round of network-wide greedy: every (cache, video) pair competes in a
+    single max-heap keyed by savings per megabyte, so no cache gets to fill up
+    before the others have bid for the same videos.
+
+    Keys are lazy. A placement only ever lowers other pairs' gains, so a
+    stored key is an upper bound: a popped pair is re-scored and placed only
+    if its true gain still equals the key, otherwise it goes back in at its
+    new value. Returns how many videos it placed.
+    """
+    sizes = inst.sizes
+    endpoint_caches = inst.endpoint_caches
+    endpoint_latency = inst.endpoint_latency
+
+    def gain_of(c, v):
+        total = 0
+        best_e = current_best
+        for e, n in video_requests[v]:
+            lat_c = endpoint_caches[e].get(c)
+            if lat_c is not None:
+                cur = best_e[e].get(v, endpoint_latency[e])
+                if lat_c < cur:
+                    total += n * (cur - lat_c)
+        return total
+
+    heap = []
+    for c in range(inst.C):
+        if remaining_capacity[c] <= 0:
+            continue
+        endpoints = inst.cache_endpoints.get(c)
+        if not endpoints:
+            continue
+        gains = defaultdict(int)
+        for e, lat_c in endpoints:
+            best_e = current_best[e]
+            L_D = endpoint_latency[e]
+            for v, n in inst.endpoint_requests[e].items():
+                cur = best_e.get(v, L_D)
+                if lat_c < cur and v not in placed[c]:
+                    gains[v] += n * (cur - lat_c)
+        cap = remaining_capacity[c]
+        for v, g in gains.items():
+            if sizes[v] <= cap:
+                heap.append((-g / sizes[v], c, v, g))
+    heapq.heapify(heap)
+
+    if on_event:
+        on_event("round_start", {"round": round_no})
+
+    # Snapshots cost O(requests) each, so sample by placement count rather
+    # than per placement.
+    snap_every = max(20, inst.C)
+    placements = 0
+    round_gain = 0
+    while heap:
+        _, c, v, g = heapq.heappop(heap)
+        size = sizes[v]
+        if size > remaining_capacity[c]:
+            continue                                  # capacity only shrinks
+        actual = gain_of(c, v)
+        if actual <= 0:
+            continue
+        if actual < g:
+            heapq.heappush(heap, (-actual / size, c, v, actual))
+            continue
+
+        placed[c].add(v)
+        remaining_capacity[c] -= size
+        placements += 1
+        round_gain += actual
+        improved = 0
+        for e, _n in video_requests[v]:
+            lat_c = endpoint_caches[e].get(c)
+            if lat_c is not None and lat_c < current_best[e].get(v, endpoint_latency[e]):
+                current_best[e][v] = lat_c
+                improved += 1
+        if on_event:
+            on_event("place", {
+                "round": round_no,
+                "cache": c,
+                "video": v,
+                "size": size,
+                "gain": actual,
+                "remaining": remaining_capacity[c],
+                "endpoints_improved": improved,
+            })
+            if placements % snap_every == 0:
+                on_event("progress", {
+                    "round": round_no,
+                    "endpoint_latency": _endpoint_latency_snapshot(inst, current_best),
+                })
+
+    if on_event:
+        on_event("round_end", {
+            "round": round_no,
+            "placements": placements,
+            "gain": round_gain,
+            "endpoint_latency": _endpoint_latency_snapshot(inst, current_best),
+        })
+    return placements
+
+
+SWAP_CANDIDATES = 20
+MAX_SWAPS_PER_CACHE = 50
+
+
+def swap_pass(inst: Instance, placed, remaining_capacity, current_best,
+              on_event=None, round_no=0):
+    """
+    Local search: in each cache, replace low-value copies with a video that
+    saves more than they do together.
+
+    A copy's value is what the score loses if it goes -- at each endpoint
+    where it is the fastest holder, the gap to the next-best holder (or the
+    datacenter). Within one cache the removed videos and the incoming one are
+    all different videos, so they touch disjoint (endpoint, video) pairs and
+    the net change is exactly gain(incoming) - sum(values removed). A swap is
+    taken only if that is strictly positive, so the score only ever rises and
+    the search terminates. Eviction is the special case of removing copies
+    worth 0 without adding anything.
+
+    Mutates `placed`, `remaining_capacity` and `current_best`; returns the
+    number of swaps made.
+    """
+    sizes = inst.sizes
+    LD = inst.endpoint_latency
+
+    holders = defaultdict(dict)                      # (endpoint, video) -> {cache: latency}
+    for c, videos in placed.items():
+        for e, lat in inst.cache_endpoints[c]:
+            requested = inst.endpoint_requests[e]
+            for v in videos:
+                if v in requested:
+                    holders[(e, v)][c] = lat
+
+    def remove(c, v, endpoints):
+        placed[c].discard(v)
+        remaining_capacity[c] += sizes[v]
+        for e, lat_c in endpoints:
+            if v not in inst.endpoint_requests[e]:
+                continue
+            h = holders[(e, v)]
+            h.pop(c, None)
+            if current_best[e].get(v) == lat_c:
+                m = min(h.values(), default=LD[e])
+                if m < LD[e]:
+                    current_best[e][v] = m
+                else:
+                    del current_best[e][v]
+
+    def add(c, v, endpoints):
+        placed[c].add(v)
+        remaining_capacity[c] -= sizes[v]
+        improved = 0
+        for e, lat_c in endpoints:
+            if v not in inst.endpoint_requests[e]:
+                continue
+            holders[(e, v)][c] = lat_c
+            if lat_c < current_best[e].get(v, LD[e]):
+                current_best[e][v] = lat_c
+                improved += 1
+        return improved
+
+    swaps = 0
+    for c in range(inst.C):
+        endpoints = inst.cache_endpoints.get(c)
+        if not endpoints or not placed.get(c):
+            continue
+        for _ in range(MAX_SWAPS_PER_CACHE):
+            here = placed[c]
+            values = dict.fromkeys(here, 0)
+            gains = defaultdict(int)
+            for e, lat_c in endpoints:
+                best_e = current_best[e]
+                L = LD[e]
+                for v, n in inst.endpoint_requests[e].items():
+                    if v in here:
+                        second = L
+                        for other, lat in holders[(e, v)].items():
+                            if other != c and lat < second:
+                                second = lat
+                        if second > lat_c:
+                            values[v] += n * (second - lat_c)
+                    else:
+                        cur = best_e.get(v, L)
+                        if lat_c < cur:
+                            gains[v] += n * (cur - lat_c)
+            if not gains:
+                break
+
+            # Cheapest copies to give up first: least value per megabyte.
+            by_cost = sorted(here, key=lambda v: values[v] / sizes[v])
+            free = remaining_capacity[c]
+            best = None
+            for w, g in heapq.nlargest(SWAP_CANDIDATES, gains.items(), key=lambda it: it[1]):
+                need = sizes[w] - free
+                cost = 0
+                out = []
+                for v in by_cost:
+                    if need <= 0:
+                        break
+                    out.append(v)
+                    cost += values[v]
+                    need -= sizes[v]
+                if need > 0:
+                    continue
+                net = g - cost
+                if net > 0 and (best is None or net > best[0]):
+                    best = (net, w, g, out)
+            if best is None:
+                break
+
+            _net, w, g, out = best
+            for v in out:
+                remove(c, v, endpoints)
+                if on_event:
+                    on_event("evict", {
+                        "round": round_no, "cache": c, "video": v, "size": sizes[v],
+                        "remaining": remaining_capacity[c],
+                        "reason": "swap", "loss": values[v],
+                    })
+            improved = add(c, w, endpoints)
+            swaps += 1
+            if on_event:
+                on_event("place", {
+                    "round": round_no, "cache": c, "video": w, "size": sizes[w],
+                    "gain": g, "remaining": remaining_capacity[c],
+                    "endpoints_improved": improved,
+                })
+    return swaps
+
+
+STRATEGIES = ("global", "per-cache")
+
+
+def solve(inst: Instance, max_rounds: int = 5, on_event=None, evict: bool = True,
+          strategy: str = "global", swap: bool = True):
     """
     Iterative greedy by savings-density, evicting dead weight after every
     round (see SOLUTION.md for the full write-up of the approach).
@@ -299,9 +538,21 @@ def solve(inst: Instance, max_rounds: int = 5, on_event=None, evict: bool = True
     # gets assigned that video.
     current_best = defaultdict(dict)
 
+    if strategy not in STRATEGIES:
+        raise ValueError(f"unknown strategy {strategy!r}, expected one of {STRATEGIES}")
+    if strategy == "global":
+        video_requests = defaultdict(list)           # video -> [(endpoint, requests)]
+        for e, reqs in inst.endpoint_requests.items():
+            for v, n in reqs.items():
+                video_requests[v].append((e, n))
+
     for _round in range(max_rounds):
-        placements = _greedy_fill(inst, placed, remaining_capacity, current_best,
-                                  1, on_event, round_offset=_round)
+        if strategy == "global":
+            placements = _global_fill(inst, placed, remaining_capacity, current_best,
+                                      video_requests, on_event, round_no=_round)
+        else:
+            placements = _greedy_fill(inst, placed, remaining_capacity, current_best,
+                                      1, on_event, round_offset=_round)
 
         evicted = 0
         if evict:
@@ -321,7 +572,12 @@ def solve(inst: Instance, max_rounds: int = 5, on_event=None, evict: bool = True
                         "remaining": remaining_capacity[c],
                     })
 
-        if not placements and not evicted:
+        swapped = 0
+        if swap:
+            swapped = swap_pass(inst, placed, remaining_capacity, current_best,
+                                on_event, round_no=_round)
+
+        if not placements and not evicted and not swapped:
             break
 
     return placed
@@ -363,10 +619,16 @@ def main():
                          help="max refinement rounds for the greedy solver")
     parser.add_argument("--no-evict", action="store_true",
                          help="skip the dead-weight eviction and refill pass")
+    parser.add_argument("--strategy", choices=STRATEGIES, default="global",
+                         help="global: one queue over every (cache, video) pair; "
+                              "per-cache: fill caches one at a time in id order")
+    parser.add_argument("--no-swap", action="store_true",
+                         help="skip the swap local search after each round")
     args = parser.parse_args()
 
     inst = parse_input(args.input_file)
-    placed = solve(inst, max_rounds=args.rounds, evict=not args.no_evict)
+    placed = solve(inst, max_rounds=args.rounds, evict=not args.no_evict,
+                   strategy=args.strategy, swap=not args.no_swap)
     write_output(args.output_file, placed, inst.C)
     s = score(inst, placed)
     print(f"Videos: {inst.V}  Endpoints: {inst.E}  Caches: {inst.C}  Requests: {inst.R}")

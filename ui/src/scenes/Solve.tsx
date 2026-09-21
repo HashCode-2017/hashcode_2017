@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useApp } from '../lib/store'
-import { rateAt } from '../lib/player'
+import { rateAt, type Player } from '../lib/player'
 import { compact, int } from '../lib/format'
 import { Chip, Label, Meter, Num, Panel, Stat } from '../components/Kit'
 import { SolveStage } from '../viz/SolveStage'
@@ -84,9 +84,12 @@ export function Solve() {
       gap: 1, background: 'var(--line)', height: '100%', minHeight: 0,
     }}>
       {/* the rule, made visible */}
-      <Panel title="cache being filled" style={{ minHeight: 0 }}>
+      <Panel title={player.perCache ? 'cache being filled' : 'latest picks, whole network'}
+        style={{ minHeight: 0 }}>
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          {scan ? (
+          {!player.perCache && player.recent.length > 0 ? (
+            <RecentPicks player={player} />
+          ) : scan ? (
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                 <span className="mono" style={{ fontSize: 17, color: 'var(--ca-bright)' }}>
@@ -137,7 +140,7 @@ export function Solve() {
           ) : (
             <div style={{ display: 'grid', placeItems: 'center', height: '100%', textAlign: 'center' }}>
               <span className="lbl" style={{ color: 'var(--ink-4)' }}>
-                {atEnd ? 'every cache filled' : 'waiting for the first scan'}
+                {atEnd ? 'placement finished' : 'waiting for the first placement'}
               </span>
             </div>
           )}
@@ -185,8 +188,16 @@ export function Solve() {
             note={result ? `final · ${int(result.score)}` : 'accumulating from each placement'}>
             <Num value={player.score} />
           </Stat>
-          <Stat label="videos placed">
+          <Stat label="videos placed" note="net of evictions">
             <Num value={player.placed} />
+          </Stat>
+          <Stat label="copies evicted"
+            note="dominated by a closer copy, space handed back">
+            <Num value={player.evicted} />
+          </Stat>
+          <Stat label="copies swapped out"
+            note="replaced by a video that saves more">
+            <Num value={player.swapped} />
           </Stat>
           <Stat label="capacity used"
             note={`${int(player.usedMB)} of ${int(player.capacityMB)} MB`}>
@@ -195,7 +206,7 @@ export function Solve() {
           <div style={{ padding: '2px 0 12px' }}>
             <Meter value={fill} segments={32} />
           </div>
-          <Stat label="pass" note={passNote(player.round, atEnd)}>
+          <Stat label="pass" note={passNote(player.round, atEnd, player.evicted + player.swapped)}>
             {player.round + 1}
           </Stat>
           <Stat label="endpoints improved by the last placement">
@@ -218,9 +229,15 @@ export function Solve() {
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
             <Label style={{ marginBottom: 6 }}>how the rule works</Label>
             <p style={{ fontSize: 11.5, color: 'var(--ink-3)', lineHeight: 1.6, margin: 0 }}>
-              For each cache, every requested video is scored by the latency it would save across
+              {player.perCache
+                ? `For each cache, every requested video is scored by the latency it would save across
               the endpoints wired to it — counting only what is not already saved by a closer
-              copy. Divide by size, take the best per megabyte, keep going while it fits.
+              copy. Divide by size, take the best per megabyte, keep going while it fits.`
+                : `Every (cache, video) pair in the network is scored by the latency it would save —
+              counting only what is not already saved by a closer copy. Divide by size and take
+              the best per megabyte anywhere, re-scoring a pair only when it reaches the top.`}
+              {' '}After each pass, copies another cache now serves at least as fast are evicted,
+              low-value copies are swapped for videos that save more, and the space is refilled.
             </p>
           </div>
         </div>
@@ -229,10 +246,46 @@ export function Solve() {
   )
 }
 
-function passNote(round: number, atEnd: boolean) {
-  if (round === 0 && !atEnd) return 'first pass over every cache'
-  if (round > 0) return 'a second pass found nothing left to gain — converged'
-  return 'converged'
+function RecentPicks({ player }: { player: Player }) {
+  const best = Math.max(...player.recent.map((p) => p.gain / p.size), 1e-9)
+  return (
+    <>
+      <Label style={{ marginBottom: 3 }}>newest first, best savings per MB anywhere</Label>
+      <div style={{ fontSize: 10.5, color: 'var(--ink-4)', marginBottom: 9 }}>
+        every cache competes for every video at once
+      </div>
+      <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+        {player.recent.map((p, i) => (
+          <div key={`${p.cache}-${p.video}-${i}`} style={{
+            display: 'grid', gridTemplateColumns: '38px 46px 1fr 40px',
+            gap: 7, alignItems: 'center', padding: '3px 0', opacity: i === 0 ? 1 : 0.75,
+          }}>
+            <span className="mono" style={{ fontSize: 10, color: 'var(--ca-bright)' }}>c{p.cache}</span>
+            <span className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>
+              {i === 0 ? '▸ ' : ''}v{p.video}
+            </span>
+            <div style={{ height: 8, background: 'var(--panel-3)' }}>
+              <div style={{
+                width: `${Math.max(2, (p.gain / p.size / best) * 100)}%`, height: '100%',
+                background: 'var(--ca)',
+              }} />
+            </div>
+            <span className="mono" style={{ fontSize: 9.5, color: 'var(--ink-3)', textAlign: 'right' }}>
+              {p.size}MB
+            </span>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function passNote(round: number, atEnd: boolean, evicted: number) {
+  if (atEnd) return 'finished — nothing left to place or evict, or the pass limit was hit'
+  if (round === 0) return 'first pass'
+  return evicted
+    ? 'refilling space freed by evictions and swaps'
+    : 'refilling remaining space'
 }
 
 function Controls({ playing, setPlaying, speed, setSpeed, frac, player, restart, atEnd, onRerun }: {
