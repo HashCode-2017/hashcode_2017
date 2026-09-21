@@ -355,6 +355,89 @@ def score(inst: Instance, placed):
     return (total_saved_ms * 1000) // total_requests
 
 
+def _limited(items, limit):
+    """First `limit` items (all if limit is 0) and how many were left out."""
+    items = list(items)
+    if limit and len(items) > limit:
+        return items[:limit], len(items) - limit
+    return items, 0
+
+
+def _more(hidden, what):
+    if hidden:
+        print(f"    ... {hidden:,} more {what} (use --log-limit 0 to show all)")
+
+
+def log_input(inst: Instance, path, limit):
+    print(f"=== INPUT: {path}")
+    print(f"  line 1  'V E R C X' = {inst.V} {inst.E} {inst.R} {inst.C} {inst.X}")
+    print(f"          {inst.V:,} videos, {inst.E:,} endpoints, {inst.R:,} request descriptions, "
+          f"{inst.C:,} caches of {inst.X:,} MB each")
+
+    print("  line 2  video sizes in MB, one per video:")
+    shown, hidden = _limited(enumerate(inst.sizes), limit)
+    print("    " + "  ".join(f"v{v}={s}" for v, s in shown))
+    _more(hidden, "videos")
+
+    print("  endpoint blocks  'L_D K', then K lines 'cache latency':")
+    shown, hidden = _limited(range(inst.E), limit)
+    for e in shown:
+        links = sorted(inst.endpoint_caches[e].items(), key=lambda cl: cl[1])
+        via = ", ".join(f"c{c} {lat}ms" for c, lat in links) or "no caches"
+        print(f"    e{e}: datacenter {inst.endpoint_latency[e]}ms, "
+              f"{len(links)} caches -> {via}")
+    _more(hidden, "endpoints")
+
+    print("  request lines  'video endpoint count':")
+    shown, hidden = _limited(inst.requests, limit)
+    for v, e, n in shown:
+        print(f"    v{v} requested {n:,} times from e{e}")
+    _more(hidden, "request lines")
+
+
+def log_placement(inst: Instance, placed, path, limit):
+    used = [c for c in range(inst.C) if placed.get(c)]
+    total_mb = sum(inst.sizes[v] for c in used for v in placed[c])
+    print(f"=== STORED IN CACHES: {len(used):,} of {inst.C:,} caches used, "
+          f"{total_mb:,} of {inst.C * inst.X:,} MB filled")
+    shown, hidden = _limited(range(inst.C), limit)
+    for c in shown:
+        videos = sorted(placed.get(c, ()))
+        mb = sum(inst.sizes[v] for v in videos)
+        vids, more_v = _limited(videos, limit)
+        listing = " ".join(f"v{v}" for v in vids) + (f" ... +{more_v} more" if more_v else "")
+        print(f"    c{c}: {mb:>6,}/{inst.X:,} MB, {len(videos):>4} videos  {listing or '(empty)'}")
+    _more(hidden, "caches")
+
+    lines = [str(len(used))] + [f"{c} " + " ".join(map(str, sorted(placed[c]))) for c in used]
+    shown, hidden = _limited(lines, limit + 1 if limit else 0)
+    for line in shown:
+        print(f"    | {line if len(line) <= 100 else line[:100] + ' ...'}")
+    _more(hidden, "lines")
+
+
+def log_score(inst: Instance, placed):
+    total_saved_ms = 0
+    total_requests = 0
+    from_cache = 0
+    for v, e, n in inst.requests:
+        L_D = inst.endpoint_latency[e]
+        best = L_D
+        for c, lat_c in inst.endpoint_caches[e].items():
+            if v in placed.get(c, ()) and lat_c < best:
+                best = lat_c
+        total_saved_ms += n * (L_D - best)
+        total_requests += n
+        if best < L_D:
+            from_cache += n
+    s = (total_saved_ms * 1000) // total_requests if total_requests else 0
+    print("\n=== SCORE")
+    print(f"  requests: {total_requests:,}, served from a cache: {from_cache:,} "
+          f"({from_cache / total_requests:.1%})" if total_requests else "  no requests")
+    print(f"  score = saved ms x 1000 / requests (rounded down) = {s:,} microseconds per request")
+    return s
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input_file")
@@ -363,15 +446,20 @@ def main():
                          help="max refinement rounds for the greedy solver")
     parser.add_argument("--no-evict", action="store_true",
                          help="skip the dead-weight eviction and refill pass")
+    parser.add_argument("--log-limit", type=int, default=10,
+                         help="max entries shown per list in the log (0 = show everything)")
+    parser.add_argument("--show-input", action="store_true",
+                         help="also log the parsed input data")
     args = parser.parse_args()
 
     inst = parse_input(args.input_file)
+    if args.show_input:
+        log_input(inst, args.input_file, args.log_limit)
+        print()
     placed = solve(inst, max_rounds=args.rounds, evict=not args.no_evict)
     write_output(args.output_file, placed, inst.C)
-    s = score(inst, placed)
-    print(f"Videos: {inst.V}  Endpoints: {inst.E}  Caches: {inst.C}  Requests: {inst.R}")
-    print(f"Wrote submission to {args.output_file}")
-    print(f"Score: {s}")
+    log_placement(inst, placed, args.output_file, args.log_limit)
+    log_score(inst, placed)
 
 
 if __name__ == "__main__":
