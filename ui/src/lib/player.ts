@@ -7,6 +7,8 @@ export interface Scan {
   top: { video: number; gain: number; size: number }[]
 }
 
+export interface Pick { cache: number; video: number; size: number; gain: number }
+
 export interface Chip { cache: number; video: number; size: number; born: number }
 
 /**
@@ -33,12 +35,17 @@ export class Player {
   cacheVideos!: Int32Array
   cumGain = 0
   placed = 0
+  evicted = 0
+  swapped = 0
   round = 0
   phase = 'idle'
   scanning: Scan | null = null
   epLatency: number[] | null = null
   chips: Chip[] = []
+  recent: Pick[] = []
   lastTouched = 0
+  /** True once the log shows per-cache scans; the global strategy emits none. */
+  perCache = false
 
   constructor(C: number, X: number, totalRequests: number) {
     this.C = C
@@ -53,11 +60,14 @@ export class Player {
     this.cacheVideos = new Int32Array(this.C)
     this.cumGain = 0
     this.placed = 0
+    this.evicted = 0
+    this.swapped = 0
     this.round = 0
     this.phase = 'idle'
     this.scanning = null
     this.epLatency = null
     this.chips = []
+    this.recent = []
     this.lastTouched = 0
   }
 
@@ -68,7 +78,12 @@ export class Player {
   get usedMB() { let s = 0; for (let i = 0; i < this.C; i++) s += this.cacheUsed[i]; return s }
   get capacityMB() { return this.C * this.X }
 
-  append(evs: Ev[]) { for (const e of evs) this.events.push(e) }
+  append(evs: Ev[]) {
+    for (const e of evs) {
+      if (e.kind === 'cache_scan') this.perCache = true
+      this.events.push(e)
+    }
+  }
 
   private apply(e: Ev, now: number) {
     switch (e.kind) {
@@ -87,19 +102,24 @@ export class Player {
         this.cumGain += e.gain!
         this.placed += 1
         this.lastTouched = e.endpoints_improved ?? 0
+        this.recent.unshift({ cache: c, video: e.video!, size: e.size!, gain: e.gain! })
+        if (this.recent.length > 12) this.recent.pop()
         if (this.chips.length < 48) {
           this.chips.push({ cache: c, video: e.video!, size: e.size!, born: now })
         }
         break
       }
       case 'evict': {
-        // A dominated copy is handed back. cumGain is deliberately untouched:
-        // gains are marginal, so the evicted copy's share was already absorbed
-        // by whichever placement superseded it.
+        // A dominated copy saves nothing, so cumGain is untouched. A copy
+        // swapped out for a better video carries the saving it gave up as
+        // `loss`, and the replacement's `place` event adds its own gain.
         const c = e.cache!
         this.cacheUsed[c] -= e.size!
         this.cacheVideos[c] -= 1
         this.placed -= 1
+        this.cumGain -= e.loss ?? 0
+        if (e.reason === 'swap') this.swapped += 1
+        else this.evicted += 1
         break
       }
       case 'progress':

@@ -48,6 +48,7 @@ export interface Ev {
   i: number; kind: string
   round?: number; cache?: number; video?: number; size?: number
   gain?: number; remaining?: number; endpoints_improved?: number
+  reason?: 'swap'; loss?: number
   candidates?: number; top?: { video: number; gain: number; size: number }[]
   placements?: number; endpoint_latency?: number[]
   phase?: string; seconds?: number; score?: number; message?: string
