@@ -1,0 +1,13 @@
+name,tag,V,E,R,C,X,size_min,size_max,avg_size,total_catalog_MB,total_capacity_MB,capacity_ratio,avg_caches_per_endpoint,endpoints_K0,zipf_a,density,total_requests
+tiny_sparse,"tiny, sparse network",10,4,15,5,80,14,60,35.8,358,400,1.117,1.5,1,0.0,0.3,18571
+tiny_dense,"tiny, dense network (all caches reachable)",10,4,20,5,120,15,45,33.2,332,600,1.807,5.0,0,0.0,1.0,34602
+small_sparse_uniform,"small, sparse, uniform demand",50,10,80,8,200,5,80,42.7,2137,1600,0.749,1.8,1,0.0,0.25,116209
+small_sparse_skewed,"small, sparse, Zipf-skewed demand",50,10,80,8,200,9,80,48.5,2423,1600,0.66,1.8,1,1.5,0.25,142407
+small_dense_uniform,"small, dense, uniform demand",50,10,100,8,300,5,79,46.0,2299,2400,1.044,6.0,0,0.0,0.8,254101
+small_dense_skewed,"small, dense, Zipf-skewed demand",50,10,100,8,300,5,80,40.8,2040,2400,1.176,6.0,0,1.5,0.8,267000
+medium_tight_capacity,"medium, tight capacity (capacity/catalog ≈ 0.2)",100,15,200,10,80,5,50,25.7,2571,800,0.311,3.0,0,1.0,0.3,508239
+medium_loose_capacity,"medium, generous capacity (capacity/catalog ≈ 0.8)",100,15,200,10,400,5,50,29.3,2929,4000,1.366,3.0,0,1.0,0.3,492804
+medium_full_mesh,"medium, every endpoint sees every cache",100,15,250,10,250,10,60,37.0,3695,2500,0.677,10.0,0,0.8,1.0,1008347
+medium_heavy_skew,"medium, extreme Zipf skew (a=2.0)",100,15,200,10,200,5,79,39.3,3930,2000,0.509,3.5,2,2.0,0.4,948223
+large_sparse,"larger scale, sparse (like videos_worth_spreading shape)",500,40,2000,30,500,1,200,98.8,49409,15000,0.304,3.8,2,1.2,0.15,7921608
+large_dense,"larger scale, dense (like kittens shape)",500,50,3000,25,1000,1,299,150.4,75218,25000,0.332,18.0,0,1.0,0.7,15070250
