@@ -24,6 +24,29 @@ Regenerate all instances (deterministic, seed `2017`):
 python3 generated_instances/generate.py --out-dir generated_instances
 ```
 
+Generate your own instances:
+
+```bash
+# list / pick presets
+python3 generated_instances/generate.py --list-presets
+python3 generated_instances/generate.py --preset tiny_dense --preset large_dense
+
+# one custom instance (unspecified parameters use defaults;
+# X defaults to caches holding ~half the catalog)
+python3 generated_instances/generate.py --name my_inst --V 200 --E 20 --C 10 --R 500 --zipf 1.5
+
+# N instances with random parameters (--scale tiny|small|medium|large|any);
+# any parameter you pass stays fixed, the rest are drawn at random
+python3 generated_instances/generate.py --random 5 --scale medium --density 1.0
+```
+
+All parameters: `--V --E --C --R --X --size-min --size-max --density
+--k0-fraction --dc-latency-min --dc-latency-max --cache-latency-min
+--cache-latency-max --zipf --video-coverage --endpoint-coverage
+--request-min --request-max` (see `--help`). Values are checked against the
+problem constraints before anything is written, and new rows are merged into
+`manifest.csv` (a row with the same name is replaced).
+
 Solve one:
 
 ```bash

@@ -30,9 +30,19 @@ Constraints enforced (from the problem statement):
   1 ≤ R_n ≤ 10000        requests per description
 
 Usage:
-    python generate.py                     # writes to current directory
+    python generate.py                     # the 12 presets, in current directory
     python generate.py --out-dir ../data   # writes elsewhere
     python generate.py --seed 12345        # reproducible run
+    python generate.py --list-presets      # show preset names
+    python generate.py --preset tiny_dense # only some presets (repeatable)
+
+    # one custom instance; unspecified parameters use defaults
+    python generate.py --name my_inst --V 200 --E 20 --C 10 --R 500 --zipf 1.5
+
+    # N instances with random parameters; any parameter given stays fixed
+    python generate.py --random 5 --scale medium --density 1.0
+
+Run with --help for every parameter.
 """
 
 import argparse
@@ -40,6 +50,7 @@ import csv
 import math
 import os
 import random
+import sys
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -391,52 +402,273 @@ def instance_stats(spec: InstanceSpec, text: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Custom and random specifications
+# ---------------------------------------------------------------------------
+
+# CLI flag -> InstanceSpec field.  Every flag defaults to None so we can tell
+# "not given" apart from an explicit value.
+SPEC_PARAMS = [
+    # flag                 field                type   help
+    ("--V",                 "V",                 int,   "number of videos"),
+    ("--E",                 "E",                 int,   "number of endpoints"),
+    ("--C",                 "C",                 int,   "number of cache servers"),
+    ("--R",                 "R",                 int,   "number of request descriptions"),
+    ("--X",                 "X",                 int,   "cache capacity in MB"),
+    ("--size-min",          "size_min",          int,   "min video size (MB)"),
+    ("--size-max",          "size_max",          int,   "max video size (MB)"),
+    ("--density",           "density",           float, "fraction of caches each endpoint reaches (0-1)"),
+    ("--k0-fraction",       "k0_fraction",       float, "fraction of endpoints with no cache (0-1)"),
+    ("--dc-latency-min",    "dc_latency_min",    int,   "min datacenter latency (ms)"),
+    ("--dc-latency-max",    "dc_latency_max",    int,   "max datacenter latency (ms)"),
+    ("--cache-latency-min", "cache_latency_min", int,   "min cache latency (ms)"),
+    ("--cache-latency-max", "cache_latency_max", int,   "max cache latency (ms)"),
+    ("--zipf",              "zipf_a",            float, "Zipf exponent for demand (0 = uniform)"),
+    ("--video-coverage",    "video_coverage",    float, "fraction of videos that get requests (0-1]"),
+    ("--endpoint-coverage", "endpoint_coverage", float, "fraction of endpoints that make requests (0-1]"),
+    ("--request-min",       "request_min",       int,   "min requests per description"),
+    ("--request-max",       "request_max",       int,   "max requests per description"),
+]
+
+# Ranges for V, E, C, R when drawing random instances, per scale tier.
+RANDOM_TIERS = {
+    "tiny":   dict(V=(5, 20),     E=(2, 6),    C=(2, 6),   R=(10, 40)),
+    "small":  dict(V=(20, 80),    E=(5, 15),   C=(4, 10),  R=(40, 150)),
+    "medium": dict(V=(80, 300),   E=(10, 30),  C=(8, 20),  R=(150, 600)),
+    "large":  dict(V=(300, 2000), E=(30, 150), C=(20, 60), R=(1000, 8000)),
+}
+
+
+def max_request_pairs(spec: InstanceSpec) -> int:
+    """Number of distinct (video, endpoint) pairs the generator can draw."""
+    n_videos = max(1, int(round(spec.video_coverage * spec.V)))
+    n_endpoints = spec.E
+    if spec.endpoint_coverage < 1.0:
+        n_endpoints = max(1, int(round(spec.endpoint_coverage * spec.E)))
+    return n_videos * n_endpoints
+
+
+def capacity_for_ratio(V: int, C: int, size_min: int, size_max: int,
+                       ratio: float) -> int:
+    """Cache capacity X giving total_capacity / expected_catalog = ratio."""
+    expected_catalog = V * (size_min + size_max) / 2
+    return min(500000, max(1, int(round(ratio * expected_catalog / C))))
+
+
+def custom_spec(name: str, fixed: dict) -> InstanceSpec:
+    """One instance from user-given params; missing ones use defaults."""
+    params = dict(V=100, E=10, C=10, R=200)
+    params.update(fixed)
+    if "X" not in params:
+        # Default to moderate pressure: caches hold ~half the catalog.
+        defaults = InstanceSpec(name="", V=1, E=1, C=1, R=1, X=1)
+        params["X"] = capacity_for_ratio(
+            params["V"], params["C"],
+            params.get("size_min", defaults.size_min),
+            params.get("size_max", defaults.size_max), 0.5)
+    return InstanceSpec(name=name, tag="custom", **params)
+
+
+def random_spec(name: str, rng: random.Random, scale: str,
+                fixed: dict) -> InstanceSpec:
+    """One instance with randomly drawn params; `fixed` ones are kept as given."""
+    if scale == "any":
+        scale = rng.choice(sorted(RANDOM_TIERS))
+    tier = RANDOM_TIERS[scale]
+    p = {}
+
+    def pick(key, draw):
+        p[key] = fixed[key] if key in fixed else draw()
+
+    pick("V", lambda: rng.randint(*tier["V"]))
+    pick("E", lambda: rng.randint(*tier["E"]))
+    pick("C", lambda: rng.randint(*tier["C"]))
+    pick("size_min", lambda: rng.randint(1, 50))
+    pick("size_max", lambda: rng.randint(p["size_min"],
+                                         min(1000, p["size_min"] + rng.randint(20, 300))))
+    pick("X", lambda: capacity_for_ratio(p["V"], p["C"], p["size_min"],
+                                         p["size_max"], rng.uniform(0.2, 1.5)))
+    pick("density", lambda: round(rng.uniform(0.1, 1.0), 2))
+    pick("k0_fraction", lambda: round(rng.uniform(0.0, 0.2), 2) if rng.random() < 0.5 else 0.0)
+    pick("dc_latency_min", lambda: rng.randint(50, 1500))
+    pick("dc_latency_max", lambda: rng.randint(p["dc_latency_min"],
+                                               min(4000, p["dc_latency_min"] + 2000)))
+    pick("cache_latency_min", lambda: rng.randint(1, 50))
+    pick("cache_latency_max", lambda: rng.randint(p["cache_latency_min"], 400))
+    pick("zipf_a", lambda: round(rng.uniform(0.0, 2.0), 2))
+    pick("video_coverage", lambda: round(rng.uniform(0.3, 1.0), 2))
+    pick("endpoint_coverage", lambda: round(rng.uniform(0.7, 1.0), 2))
+    pick("request_min", lambda: rng.randint(1, 100))
+    pick("request_max", lambda: rng.randint(max(p["request_min"], 500), 10000))
+
+    spec = InstanceSpec(name=name, tag=f"random ({scale})", R=1, **p)
+    # A drawn R must not exceed the distinct (video, endpoint) pairs available.
+    spec.R = fixed["R"] if "R" in fixed else min(rng.randint(*tier["R"]),
+                                                 max_request_pairs(spec))
+    return spec
+
+
+def validate_spec(spec: InstanceSpec) -> List[str]:
+    """Return a list of constraint violations (empty if the spec is valid)."""
+    s = spec
+    checks = [
+        (1 <= s.V <= 10000, f"V={s.V} must be in [1, 10000]"),
+        (1 <= s.E <= 1000, f"E={s.E} must be in [1, 1000]"),
+        (1 <= s.C <= 1000, f"C={s.C} must be in [1, 1000]"),
+        (1 <= s.X <= 500000, f"X={s.X} must be in [1, 500000]"),
+        (1 <= s.R <= 1000000, f"R={s.R} must be in [1, 1000000]"),
+        (1 <= s.size_min <= s.size_max <= 1000,
+         f"need 1 <= size_min ({s.size_min}) <= size_max ({s.size_max}) <= 1000"),
+        (0.0 <= s.density <= 1.0, f"density={s.density} must be in [0, 1]"),
+        (0.0 <= s.k0_fraction <= 1.0, f"k0_fraction={s.k0_fraction} must be in [0, 1]"),
+        (2 <= s.dc_latency_min <= s.dc_latency_max <= 4000,
+         f"need 2 <= dc_latency_min ({s.dc_latency_min}) <= dc_latency_max ({s.dc_latency_max}) <= 4000"),
+        (1 <= s.cache_latency_min <= s.cache_latency_max,
+         f"need 1 <= cache_latency_min ({s.cache_latency_min}) <= cache_latency_max ({s.cache_latency_max})"),
+        (s.zipf_a >= 0.0, f"zipf={s.zipf_a} must be >= 0"),
+        (0.0 < s.video_coverage <= 1.0, f"video_coverage={s.video_coverage} must be in (0, 1]"),
+        (0.0 < s.endpoint_coverage <= 1.0, f"endpoint_coverage={s.endpoint_coverage} must be in (0, 1]"),
+        (1 <= s.request_min <= s.request_max <= 10000,
+         f"need 1 <= request_min ({s.request_min}) <= request_max ({s.request_max}) <= 10000"),
+    ]
+    errors = [msg for ok, msg in checks if not ok]
+    if not errors and s.R > max_request_pairs(s):
+        errors.append(f"R={s.R} exceeds the {max_request_pairs(s)} distinct "
+                      f"(video, endpoint) pairs available; lower R or raise "
+                      f"V/E/video_coverage/endpoint_coverage")
+    return errors
+
+
+# ---------------------------------------------------------------------------
+# Output
+# ---------------------------------------------------------------------------
+
+def write_manifest(out_dir: str, rows: List[dict]) -> None:
+    """Merge rows into out_dir/manifest.csv, replacing rows with the same name."""
+    csv_path = os.path.join(out_dir, "manifest.csv")
+    merged = {}
+    if os.path.exists(csv_path):
+        with open(csv_path, encoding="utf-8", newline="") as f:
+            for row in csv.DictReader(f):
+                merged[row["name"]] = row
+    for row in rows:
+        merged[row["name"]] = row
+    with open(csv_path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()),
+                                extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(merged.values())
+
+
+def emit(spec: InstanceSpec, text: str, out_dir: str) -> dict:
+    """Write one .in file, print a summary line, return its manifest row."""
+    path = os.path.join(out_dir, f"{spec.name}.in")
+    with open(path, "w", encoding="ascii", newline="\n") as f:
+        f.write(text)
+
+    stats = instance_stats(spec, text)
+    print(f"  {spec.name + '.in':<30s}  V={stats['V']:<5} E={stats['E']:<4} "
+          f"C={stats['C']:<4} R={stats['R']:<5} X={stats['X']:<6} "
+          f"cap/cat={stats['capacity_ratio']:.2f}  "
+          f"avg_K={stats['avg_caches_per_endpoint']:<5}  "
+          f"zipf={spec.zipf_a}")
+    if stats["R"] < spec.R:
+        print(f"    warning: only {stats['R']} of {spec.R} requested descriptions "
+              f"could be drawn (too few distinct pairs under this skew)")
+    return stats
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate a benchmark dataset of Hash Code 2017 instances."
+        description="Generate Hash Code 2017 instances.  With no instance "
+                    "parameters it writes the 12 preset instances; with "
+                    "parameters it writes one custom instance; with --random N "
+                    "it writes N instances with random parameters (any "
+                    "parameter you pass stays fixed).",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument(
-        "--out-dir", default=".",
-        help="directory to write .in files and manifest.csv (default: cwd)",
-    )
-    parser.add_argument(
-        "--seed", type=int, default=2017,
-        help="RNG seed for reproducibility (default: 2017)",
-    )
+    parser.add_argument("--out-dir", default=".",
+                        help="directory for .in files and manifest.csv")
+    parser.add_argument("--seed", type=int, default=2017,
+                        help="RNG seed for reproducibility")
+
+    mode = parser.add_argument_group("mode")
+    mode.add_argument("--preset", action="append", metavar="NAME",
+                      help="only write this preset (repeatable)")
+    mode.add_argument("--list-presets", action="store_true",
+                      help="list preset names and exit")
+    mode.add_argument("--random", type=int, metavar="N",
+                      help="generate N instances with random parameters")
+    mode.add_argument("--scale", default="any",
+                      choices=["any"] + sorted(RANDOM_TIERS),
+                      help="size tier for --random")
+    mode.add_argument("--name",
+                      help="file name for a custom instance (default: custom), "
+                           "or name prefix for --random (default: random)")
+
+    params = parser.add_argument_group("instance parameters")
+    for flag, dest, typ, help_text in SPEC_PARAMS:
+        params.add_argument(flag, dest=dest, type=typ, default=None,
+                            help=help_text)
+
     args = parser.parse_args()
+
+    if args.list_presets:
+        # Tags contain non-ASCII (e.g. "≈"), which the Windows console rejects.
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(errors="replace")
+        for spec in INSTANCE_SPECS:
+            print(f"  {spec.name:<24s} {spec.tag}")
+        return
+
+    fixed = {dest: getattr(args, dest) for _, dest, _, _ in SPEC_PARAMS
+             if getattr(args, dest) is not None}
+
+    if args.preset and (fixed or args.random is not None):
+        parser.error("--preset cannot be combined with --random or instance parameters")
+    if args.random is not None and args.random < 1:
+        parser.error("--random N needs N >= 1")
 
     os.makedirs(args.out_dir, exist_ok=True)
     rng = random.Random(args.seed)
+    rows = []
 
-    manifest_rows = []
+    if args.random is not None:
+        prefix = args.name or "random"
+        width = len(str(args.random))
+        for i in range(1, args.random + 1):
+            spec = random_spec(f"{prefix}_{i:0{width}d}", rng, args.scale, fixed)
+            errors = validate_spec(spec)
+            if errors:
+                parser.error(f"{spec.name}: " + "; ".join(errors))
+            rows.append(emit(spec, generate_instance(spec, rng), args.out_dir))
 
-    for spec in INSTANCE_SPECS:
-        text = generate_instance(spec, rng)
-        path = os.path.join(args.out_dir, f"{spec.name}.in")
-        with open(path, "w", encoding="ascii", newline="\n") as f:
-            f.write(text)
+    elif fixed:
+        spec = custom_spec(args.name or "custom", fixed)
+        errors = validate_spec(spec)
+        if errors:
+            parser.error("; ".join(errors))
+        rows.append(emit(spec, generate_instance(spec, rng), args.out_dir))
 
-        stats = instance_stats(spec, text)
-        manifest_rows.append(stats)
+    else:
+        known = {s.name for s in INSTANCE_SPECS}
+        unknown = set(args.preset or []) - known
+        if unknown:
+            parser.error(f"unknown preset(s): {', '.join(sorted(unknown))} "
+                         f"(see --list-presets)")
+        wanted = set(args.preset) if args.preset else known
+        # Always draw every preset in order so a subset comes out identical
+        # to the same files from a full run.
+        for spec in INSTANCE_SPECS:
+            text = generate_instance(spec, rng)
+            if spec.name in wanted:
+                rows.append(emit(spec, text, args.out_dir))
 
-        print(f"  {spec.name + '.in':<30s}  V={stats['V']:<5} E={stats['E']:<4} "
-              f"C={stats['C']:<4} R={stats['R']:<5} X={stats['X']:<6} "
-              f"cap/cat={stats['capacity_ratio']:.2f}  "
-              f"avg_K={stats['avg_caches_per_endpoint']:<5}  "
-              f"zipf={spec.zipf_a}")
-
-    # Write CSV manifest
-    csv_path = os.path.join(args.out_dir, "manifest.csv")
-    fieldnames = list(manifest_rows[0].keys())
-    with open(csv_path, "w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(manifest_rows)
-
-    print(f"\n  Wrote {len(manifest_rows)} instances + manifest.csv to {os.path.abspath(args.out_dir)}/")
+    write_manifest(args.out_dir, rows)
+    print(f"\n  Wrote {len(rows)} instance(s) + manifest.csv to {os.path.abspath(args.out_dir)}/")
 
 
 if __name__ == "__main__":
