@@ -219,6 +219,9 @@ export const useApp = create<App>((set, get) => ({
 
   toggleExplore: () => {
     if (!get().result) return
-    set((s) => ({ explore: !s.explore }))
+    // A page (leaderboard, statistics, admin...) is drawn over everything,
+    // so coming from one always means "open explore", never "toggle".
+    if (get().page) set({ page: null, explore: true })
+    else set((s) => ({ explore: !s.explore }))
   },
 }))

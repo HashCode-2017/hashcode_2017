@@ -42,7 +42,9 @@ export default function App() {
       const el = document.activeElement
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return
       const s = useApp.getState()
-      if (!s.user || s.showRank || s.page) return
+      if (!s.user || s.showRank) return
+      // On a page only E (free explore) applies; the act keys belong to the story.
+      if (s.page) { if (e.key === 'e' || e.key === 'E') s.toggleExplore(); return }
       if (e.key === 'ArrowRight') { s.go(1); e.preventDefault() }
       else if (e.key === 'ArrowLeft') { s.go(-1); e.preventDefault() }
       else if (e.key === 'e' || e.key === 'E') s.toggleExplore()
