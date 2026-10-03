@@ -690,7 +690,7 @@ def log_score(inst: Instance, placed):
     print("\n=== SCORE")
     print(f"  requests: {total_requests:,}, served from a cache: {from_cache:,} "
           f"({from_cache / total_requests:.1%})" if total_requests else "  no requests")
-    print(f"  score = saved ms x 1000 / requests (rounded down) = {s:,} microseconds per request")
+    print(f"  score: {s:,}")
     return s
 
 
@@ -717,6 +717,7 @@ def main():
     if args.show_input:
         log_input(inst, args.input_file, args.log_limit)
         print()
+    print(f"=== DATA: {inst.V:,} videos, {inst.E:,} endpoints\n")
     placed = solve(inst, max_rounds=args.rounds, evict=not args.no_evict,
                    strategy=args.strategy, swap=not args.no_swap)
     write_output(args.output_file, placed, inst.C)

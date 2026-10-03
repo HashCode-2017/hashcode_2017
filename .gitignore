@@ -8,3 +8,4 @@ ui/tsconfig.tsbuildinfo
 *.pptx
 *.pdf
 *.txt
+*.in
