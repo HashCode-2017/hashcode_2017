@@ -183,7 +183,7 @@ class SqliteStore:
         return self._all("SELECT id, username, grp FROM hc_users")
 
     def all_submissions(self):
-        return self._all("SELECT id, user_id, instance, score, valid, source, created FROM hc_submissions")
+        return self._all("SELECT id, user_id, instance, run_id, score, valid, source, created FROM hc_submissions")
 
 
 # ======================================================================
@@ -403,7 +403,7 @@ class SupabaseStore:
         return rows[0]["data"] if rows else None
 
     def all_submissions(self):
-        rows = self._get("hc_submissions", select="id,user_id,instance,score,valid,source,created")
+        rows = self._get("hc_submissions", select="id,user_id,instance,run_id,score,valid,source,created")
         for r in rows:
             r["created"] = _epoch(r["created"])
         return rows
