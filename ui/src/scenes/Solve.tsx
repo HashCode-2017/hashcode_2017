@@ -157,7 +157,7 @@ export function Solve() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {waiting && <Chip tone="dc">solver still working…</Chip>}
             {meta && meta.source === 'trace' && <Chip tone="dc">{meta.owner}'s trace</Chip>}
-            {meta && meta.source === 'out' && <Chip tone="idle">final placement · no trace</Chip>}
+            {meta && meta.source === 'out' && <Chip tone="idle">no trace · most valuable first</Chip>}
             {meta && meta.source === 'solver' && meta.cached && <Chip tone="ca">prewarmed replay</Chip>}
             {meta && meta.source === 'solver' && !meta.cached && streaming && <Chip tone="dc">solving live</Chip>}
             <span className="lbl mono" style={{ color: 'var(--ink-3)' }}>

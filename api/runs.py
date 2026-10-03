@@ -203,7 +203,7 @@ def start_submission(instance_id, out_text, trace_text, owner, on_done=None):
 
     def produce(inst, run):
         if ops is None:
-            placed, problems, steps = replay.replay(inst, replay.ops_from_out(out_placed), run.emit)
+            placed, problems, steps = replay.replay(inst, replay.ops_from_out(inst, out_placed), run.emit)
             return placed, {"trace": {"provided": False, "steps": steps}}
         trace_placed, problems, steps = replay.replay(inst, ops, run.emit)
         diffs = replay.compare(trace_placed, out_placed)

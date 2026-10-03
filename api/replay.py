@@ -98,12 +98,29 @@ def parse_trace(inst: Instance, text: str):
     return ops
 
 
-def ops_from_out(placed):
-    """No trace: replay the final placement cache by cache, in file order."""
-    ops = [("#", "final placement (no trace provided)", None, 0)]
+def ops_from_out(inst: Instance, placed):
+    """No trace: replay the final placement most valuable first.
+
+    File order fills one cache completely before touching the next, which
+    looks nothing like any real algorithm. Instead each (cache, video) pair is
+    ranked by the latency it would save on its own -- requests times time
+    saved, over the endpoints wired to that cache -- per megabyte, so the
+    replay lands the big wins first, spread across the whole network. The
+    final state, and so the score, is exactly the .out either way.
+    """
+    ranked = []
     for c, videos in placed.items():
+        links = inst.cache_endpoints.get(c, ())
         for v in videos:
-            ops.append(("+", c, v, 0))
+            saving = 0
+            for e, lat in links:
+                n = inst.endpoint_requests[e].get(v) if e in inst.endpoint_requests else None
+                if n:
+                    saving += n * max(0, inst.endpoint_latency[e] - lat)
+            ranked.append((saving / max(1, inst.sizes[v]), c, v))
+    ranked.sort(key=lambda t: (-t[0], t[1], t[2]))
+    ops = [("#", "final placement, most valuable first (no trace provided)", None, 0)]
+    ops += [("+", c, v, 0) for _, c, v in ranked]
     return ops
 
 
