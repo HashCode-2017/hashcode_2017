@@ -20,10 +20,18 @@ export function RoutedMatrix({ m, height = 300 }: { m: RoutedData; height?: numb
   const wrap = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<{ r: number; c: number; x: number; y: number } | null>(null)
 
-  let hi = 1
-  for (const row of m.served) for (const v of row) if (v > hi) hi = v
-  for (const v of m.datacenter) if (v > hi) hi = v
-  const t = (v: number) => Math.log10(1 + v) / Math.log10(1 + hi)
+  // Each ramp spans its own smallest to largest non-zero value: on a shared
+  // scale the big datacenter numbers flatten every cache block to one shade.
+  const span = (values: number[]) => {
+    let lo = Infinity, hi = 0
+    for (const v of values) if (v > 0) { if (v < lo) lo = v; if (v > hi) hi = v }
+    return Number.isFinite(lo) ? [Math.log10(lo), Math.log10(hi)] : [0, 1]
+  }
+  const [cLo, cHi] = span(m.served.flat())
+  const [dLo, dHi] = span(m.datacenter)
+  const tCache = (v: number) => cHi > cLo ? (Math.log10(v) - cLo) / (cHi - cLo) : 1
+  const tDc = (v: number) => dHi > dLo ? (Math.log10(v) - dLo) / (dHi - dLo) : 1
+  const hi = cHi + dHi
   const gridW = 1 - DC_GAP - DC_COL
 
   useEffect(() => {
@@ -36,11 +44,11 @@ export function RoutedMatrix({ m, height = 300 }: { m: RoutedData; height?: numb
     for (let r = 0; r < m.rows; r++) {
       for (let c = 0; c < m.cols; c++) {
         const v = m.served[r][c]
-        ctx.fillStyle = v ? ramp(SEQ, t(v)) : PANEL2
+        ctx.fillStyle = v ? ramp(SEQ, tCache(v)) : PANEL2
         ctx.fillRect(c * cw, r * ch, Math.ceil(cw), Math.ceil(ch))
       }
       const d = m.datacenter[r]
-      ctx.fillStyle = d ? ramp(AMB, t(d)) : PANEL2
+      ctx.fillStyle = d ? ramp(AMB, tDc(d)) : PANEL2
       ctx.fillRect(w * (1 - DC_COL), r * ch, w * DC_COL, Math.ceil(ch))
     }
     if (hover) {
