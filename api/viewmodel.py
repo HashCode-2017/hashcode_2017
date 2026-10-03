@@ -200,3 +200,39 @@ def topology(inst: Instance, instance_id):
 def file_head(path, limit=HEAD_BYTES):
     with open(path, "r", encoding="ascii") as f:
         return f.read(limit)
+
+
+def routed_matrix(inst: Instance, placed):
+    """Where requests are served from once the caches are filled, bucketed.
+
+    Same layout as `_matrix` (rows: endpoints by demand, columns: caches by
+    connectivity), so it reads as the "after" of the cold-network map. Each
+    cell is the request volume those endpoints get from those caches; the
+    extra `datacenter` column is what each row still fetches from the
+    datacenter. This is the routing view for data sets too dense to draw.
+    """
+    from .analysis import _best_source
+    demand = _endpoint_demand(inst)
+    ep_order = sorted(range(inst.E), key=lambda e: -demand[e])
+    c_order = sorted(range(inst.C), key=lambda c: -len(inst.cache_endpoints.get(c) or []))
+    rows = min(MATRIX_BUCKETS, len(ep_order))
+    cols = min(MATRIX_BUCKETS, len(c_order))
+    if rows == 0 or cols == 0:
+        return None
+    ep_bucket = {e: min(rows - 1, i * rows // len(ep_order)) for i, e in enumerate(ep_order)}
+    c_bucket = {c: min(cols - 1, i * cols // len(c_order)) for i, c in enumerate(c_order)}
+
+    best = _best_source(inst, placed)
+    served = [[0] * cols for _ in range(rows)]
+    datacenter = [0] * rows
+    for v, e, n in inst.requests:
+        slot = best.get(e)
+        hit = slot.get(v) if slot else None
+        if hit:
+            served[ep_bucket[e]][c_bucket[hit[1]]] += n
+        else:
+            datacenter[ep_bucket[e]] += n
+    return {
+        "rows": rows, "cols": cols, "served": served, "datacenter": datacenter,
+        "rowLabel": "endpoints, by demand", "colLabel": "caches, by connectivity",
+    }

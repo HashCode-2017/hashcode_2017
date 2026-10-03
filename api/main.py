@@ -154,6 +154,16 @@ def api_validate(run_id: str, user=Depends(viewer)):
     return run.result["validation"]
 
 
+@app.get("/api/runs/{run_id}/routed")
+def api_routed(run_id: str, user=Depends(viewer)):
+    """Bucketed routing map, computed on demand from the run's placement."""
+    run = _visible_run(run_id, user)
+    if run.result is None:
+        raise HTTPException(409, f"run is {run.status}")
+    placed = {int(c): set(vs) for c, vs in run.result["placement"].items()}
+    return viewmodel.routed_matrix(_load(run.instance), placed)
+
+
 @app.get("/api/runs/{run_id}/stream")
 async def api_stream(run_id: str, start: int = 0, user=Depends(viewer)):
     """Server-sent events, batched.

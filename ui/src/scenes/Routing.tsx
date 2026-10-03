@@ -4,6 +4,8 @@ import { compact, int } from '../lib/format'
 import { Label, Num, Panel, SplitBar, Stat } from '../components/Kit'
 import { LatencyCompare, RankBars, Treemap } from '../viz/Charts'
 import { NetworkCanvas } from '../viz/NetworkCanvas'
+import { RoutedMatrix } from '../viz/RoutedMatrix'
+import { api, type RoutedMatrix as RoutedData } from '../lib/api'
 import { NeedSubmission } from './NeedSubmission'
 
 /**
@@ -18,6 +20,19 @@ export function Routing() {
   const topo = useApp((s) => s.topology)
   const streaming = useApp((s) => s.streaming)
   const [big, setBig] = useState(false)
+  const meta = useApp((s) => s.meta)
+  const [routed, setRouted] = useState<RoutedData | null>(null)
+  const [routedError, setRoutedError] = useState<string | null>(null)
+  const dense = topo?.tier === 'aggregate'
+
+  // Too dense to draw as a network: fetch the bucketed routing map instead.
+  useEffect(() => {
+    if (!dense || !result || !meta) return
+    let alive = true
+    setRouted(null); setRoutedError(null)
+    api.routed(meta.id).then((m) => alive && setRouted(m)).catch((e) => alive && setRoutedError(String(e)))
+    return () => { alive = false }
+  }, [dense, result, meta])
   const needSubmission = useApp((s) => s.needSubmission)
 
   useEffect(() => {
@@ -45,9 +60,9 @@ export function Routing() {
   const graph = topo.tier === 'graph'
   // The canvas lays itself out once, at mount: key it by size so expanding
   // re-runs the layout at the new dimensions instead of stretching the old one.
-  const network = graph && (
+  const network = (
     <Panel
-      title="the network, now routed"
+      title={graph ? 'the network, now routed' : 'the network, now routed — where each block of endpoints is served from'}
       right={
         <button className="lbl" onClick={() => setBig((b) => !b)} style={{ color: 'var(--ca-bright)' }}>
           {big ? 'shrink · esc' : 'expand ⤢'}
@@ -56,7 +71,17 @@ export function Routing() {
       flush
       style={{ minHeight: 0, height: '100%' }}
     >
-      <NetworkCanvas key={big ? 'big' : 'normal'} topo={topo} routed placement={result.placement} />
+      {graph ? (
+        <NetworkCanvas key={big ? 'big' : 'normal'} topo={topo} routed placement={result.placement} />
+      ) : routed ? (
+        <div style={{ height: '100%', padding: 12, boxSizing: 'border-box' }}>
+          <RoutedMatrix m={routed} height="100%" />
+        </div>
+      ) : (
+        <div className="lbl" style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--ink-3)' }}>
+          {routedError ?? 'routing every request to its source…'}
+        </div>
+      )}
     </Panel>
   )
 
@@ -70,7 +95,7 @@ export function Routing() {
       gap: 1, background: 'var(--line)', height: '100%', minHeight: 0,
     }}>
       <div style={{
-        display: 'grid', gridTemplateRows: graph ? 'minmax(320px, 1.6fr) auto' : '1fr',
+        display: 'grid', gridTemplateRows: 'minmax(320px, 1.6fr) auto',
         gap: 1, minHeight: 0,
       }}>
         {network}
@@ -79,7 +104,7 @@ export function Routing() {
             <LatencyCompare
               before={result.latencyBefore}
               after={result.latencyAfter}
-              height={graph ? 120 : 168}
+              height={120}
             />
             <div>
               <Label style={{ marginBottom: 8 }}>where the request volume goes</Label>

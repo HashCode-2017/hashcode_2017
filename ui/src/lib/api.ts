@@ -116,6 +116,12 @@ export interface BoardRow {
 }
 export interface Board { scope: string; by: 'user' | 'group'; instances: string[]; rows: BoardRow[] }
 export interface RankBoard { scope: string; by: 'user' | 'group'; before: BoardRow[]; after: BoardRow[] }
+/** Bucketed endpoint x cache request volumes after placement (dense data sets). */
+export interface RoutedMatrix {
+  rows: number; cols: number
+  served: number[][]; datacenter: number[]
+  rowLabel: string; colLabel: string
+}
 export interface ClassStats {
   players: number; submissions: number; valid: number; withTrace: number
   instances: {
@@ -191,6 +197,7 @@ export const api = {
     post<RunMeta>('/api/submissions', { instance, out, trace }),
   mySubmissions: () => get<MySubmission[]>('/api/submissions/mine'),
   stats: () => get<ClassStats>('/api/stats'),
+  routed: (runId: string) => get<RoutedMatrix>(`/api/runs/${runId}/routed`),
   ranked: () => get<{ instances: string[]; default: string[] }>('/api/ranked'),
   people: () => get<Person[]>('/api/admin/people'),
   setGroup: (userId: number, group: string) => send<User>('PUT', `/api/admin/people/${userId}/group`, { group }),
