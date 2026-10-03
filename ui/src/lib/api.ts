@@ -3,7 +3,7 @@ export type Tier = 'graph' | 'aggregate'
 export interface InstanceRow {
   id: string; file: string; blurb: string; bytes: number; tier: Tier
   V: number; E: number; R: number; C: number; X: number
-  prewarmed: boolean; loaded: boolean
+  prewarmed: boolean; loaded: boolean; official: boolean
 }
 
 export interface Hist { lo: number; hi: number; bins: number[]; max: number }
@@ -76,6 +76,11 @@ export interface RunResult {
   }
   placement: Record<string, number[]>
   submission: string
+  trace?: {
+    provided: boolean; steps: number
+    problems?: { line: number; kind: string; detail: string }[]
+    consistent?: boolean; differenceCount?: number
+  }
   validation: {
     valid: boolean
     problems: { cache: number; kind: string; detail: string }[]
@@ -86,6 +91,7 @@ export interface RunResult {
 
 export interface RunMeta {
   id: string; instance: string; rounds: number
+  source: 'solver' | 'trace' | 'out'; owner: string | null
   status: 'queued' | 'parsing' | 'solving' | 'analysing' | 'done' | 'error'
   error: string | null; cached: boolean; eventCount: number
   parseSeconds: number | null; solveSeconds: number | null; analyseSeconds: number | null
@@ -94,9 +100,64 @@ export interface RunMeta {
 
 export interface RunRecord extends RunMeta { events: Ev[]; result: RunResult | null }
 
+export interface User { id: number; username: string; group: string | null; isAdmin?: boolean }
+export interface Person { id: number; username: string; group: string | null; submissions: number; isAdmin?: boolean }
+/** `capacity` is null for the Professors group; `admin` groups need the admin code to join. */
+export interface GroupSeat { group: string; members: number; capacity: number | null; admin?: boolean; label?: string }
+export interface MySubmission {
+  id: number; instance: string; run_id: string; score: number
+  valid: number; source: string; created: number
+  /** who in the group uploaded it */
+  username?: string
+}
+export interface BoardRow {
+  key: string; name: string; group: string; rank: number
+  total: number; scores: Record<string, number>
+}
+export interface Board { scope: string; by: 'user' | 'group'; instances: string[]; rows: BoardRow[] }
+export interface RankBoard { scope: string; by: 'user' | 'group'; before: BoardRow[]; after: BoardRow[] }
+export interface ClassStats {
+  players: number; submissions: number; valid: number; withTrace: number
+  instances: {
+    instance: string; submissions: number; invalid: number; withTrace: number
+    players: number; groups: number
+    best: number | null; median: number | null; mean: number | null; lowest: number | null
+    playerBests: number[]
+  }[]
+  groups: { group: string; members: number; submissions: number }[]
+  timeline: [number, number][]
+}
+export interface RankReport {
+  instance: string; score: number; valid: boolean
+  username: string; group: string; userKey: string; groupKey: string
+  ranked: string[]
+  boards: Record<string, RankBoard>
+}
+
+/** FastAPI puts the reason in `detail`; show that, not the status line. */
+async function failure(r: Response, url: string) {
+  let msg = `${r.status} ${r.statusText} — ${url}`
+  try { const j = await r.json(); if (j && typeof j.detail === 'string') msg = j.detail } catch { /* not JSON */ }
+  return new Error(msg)
+}
+
 async function get<T>(url: string): Promise<T> {
-  const r = await fetch(url)
-  if (!r.ok) throw new Error(`${r.status} ${r.statusText} — ${url}`)
+  const r = await fetch(url, { credentials: 'same-origin' })
+  if (!r.ok) throw await failure(r, url)
+  return r.json() as Promise<T>
+}
+
+async function post<T>(url: string, body: unknown): Promise<T> {
+  return send<T>('POST', url, body)
+}
+
+async function send<T>(method: string, url: string, body: unknown): Promise<T> {
+  const r = await fetch(url, {
+    method, credentials: 'same-origin',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!r.ok) throw await failure(r, url)
   return r.json() as Promise<T>
 }
 
@@ -116,6 +177,27 @@ export const api = {
     return r.json()
   },
   submissionUrl: (runId: string) => `/api/runs/${runId}/submission`,
+  downloadUrl: (instanceId: string) => `/api/instances/${instanceId}/download`,
+
+  groups: () => get<GroupSeat[]>('/api/groups'),
+  me: () => get<User>('/api/auth/me'),
+  login: (username: string, password: string) =>
+    post<User>('/api/auth/login', { username, password }),
+  register: (username: string, email: string, password: string, group: string, code?: string) =>
+    post<User>('/api/auth/register', { username, email, password, group, code }),
+  logout: () => post<{ ok: boolean }>('/api/auth/logout', {}),
+
+  submit: (instance: string, out: string, trace: string | null) =>
+    post<RunMeta>('/api/submissions', { instance, out, trace }),
+  mySubmissions: () => get<MySubmission[]>('/api/submissions/mine'),
+  stats: () => get<ClassStats>('/api/stats'),
+  ranked: () => get<{ instances: string[]; default: string[] }>('/api/ranked'),
+  people: () => get<Person[]>('/api/admin/people'),
+  setGroup: (userId: number, group: string) => send<User>('PUT', `/api/admin/people/${userId}/group`, { group }),
+  setRanked: (instances: string[]) => send<{ instances: string[] }>('PUT', '/api/admin/ranked', { instances }),
+  rank: (runId: string) => get<RankReport>(`/api/submissions/${runId}/rank`),
+  leaderboard: (scope: string, by: 'user' | 'group') =>
+    get<Board>(`/api/leaderboard?scope=${encodeURIComponent(scope)}&by=${by}`),
 }
 
 /** Follow a live run. Events arrive batched; `onBatch` gets each batch in order. */

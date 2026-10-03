@@ -9,6 +9,12 @@ import { Solve } from './scenes/Solve'
 import { Routing } from './scenes/Routing'
 import { Submission } from './scenes/Submission'
 import { Explore } from './scenes/Explore'
+import { Auth } from './scenes/Auth'
+import { Submit } from './scenes/Submit'
+import { Leaderboard } from './scenes/Leaderboard'
+import { Stats } from './scenes/Stats'
+import { Admin } from './scenes/Admin'
+import { RankReveal } from './components/RankReveal'
 
 const SCENES = [Select, Ingest, Topology, Solve, Routing, Submission]
 
@@ -20,15 +26,23 @@ export default function App() {
   const result = useApp((s) => s.result)
   const error = useApp((s) => s.error)
   const loadInstances = useApp((s) => s.loadInstances)
+  const user = useApp((s) => s.user)
+  const authChecked = useApp((s) => s.authChecked)
+  const checkAuth = useApp((s) => s.checkAuth)
+  const page = useApp((s) => s.page)
+  const showRank = useApp((s) => s.showRank)
+  const setShowRank = useApp((s) => s.setShowRank)
 
-  useEffect(() => { void loadInstances() }, [loadInstances])
+  useEffect(() => { void checkAuth() }, [checkAuth])
+  useEffect(() => { if (user) void loadInstances() }, [user, loadInstances])
 
   // Presenter keys: the whole story is drivable without a mouse.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = document.activeElement
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return
       const s = useApp.getState()
+      if (!s.user || s.showRank || s.page) return
       if (e.key === 'ArrowRight') { s.go(1); e.preventDefault() }
       else if (e.key === 'ArrowLeft') { s.go(-1); e.preventDefault() }
       else if (e.key === 'e' || e.key === 'E') s.toggleExplore()
@@ -43,6 +57,16 @@ export default function App() {
   }, [])
 
   const Scene = SCENES[act]
+
+  if (!authChecked) return null
+  if (!user) return (<><Chrome /><Auth /></>)
+
+  const view = page ?? (explore ? 'explore' : act)
+  const body = page === 'submit' ? <Submit />
+    : page === 'leaderboard' ? <Leaderboard />
+    : page === 'stats' ? <Stats />
+    : page === 'admin' ? <Admin />
+    : explore ? <Explore /> : <Scene />
 
   return (
     <div style={{
@@ -67,19 +91,22 @@ export default function App() {
               instance and the incoming scene never mounts. */}
           <AnimatePresence initial={false}>
             <motion.div
-              key={explore ? 'explore' : act}
+              key={view}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.3, ease: [0.22, 0.61, 0.36, 1] }}
               style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}
             >
-              {explore ? <Explore /> : <Scene />}
+              {body}
             </motion.div>
           </AnimatePresence>
         </div>
       </main>
       <StatusStrip instanceId={instanceId} meta={meta} hasResult={!!result} />
+      <AnimatePresence>
+        {showRank && <RankReveal key={showRank} runId={showRank} onClose={() => setShowRank(null)} />}
+      </AnimatePresence>
     </div>
   )
 }
@@ -88,9 +115,15 @@ function Rail() {
   const act = useApp((s) => s.act)
   const setAct = useApp((s) => s.setAct)
   const instanceId = useApp((s) => s.instanceId)
+  const runId = useApp((s) => s.runId)
+  const player = useApp((s) => s.player)
   const explore = useApp((s) => s.explore)
   const toggleExplore = useApp((s) => s.toggleExplore)
   const result = useApp((s) => s.result)
+  const page = useApp((s) => s.page)
+  const openPage = useApp((s) => s.openPage)
+  const user = useApp((s) => s.user)
+  const logout = useApp((s) => s.logout)
 
   return (
     <aside className="layer" style={{
@@ -106,9 +139,41 @@ function Rail() {
 
       <nav style={{ flex: 1, padding: '8px 0', overflowY: 'auto' }}>
         {ACTS.map((a, i) => {
-          const locked = i > 0 && !instanceId
-          const active = !explore && i === act
-          return (
+          // Placement onwards replays a submission: closed until the group has one here.
+          const locked = (i > 0 && !instanceId) || (i >= 3 && !runId && !player)
+          const active = !explore && !page && i === act
+          // Submitting is a step of the flow: once the data set is chosen and
+          // read in, this is where a player hands in their own placement.
+          const submitting = page === 'submit'
+          const submitStep = a.key === 'ingest' && (
+            <button
+              key="submit"
+              disabled={!instanceId}
+              onClick={() => openPage(submitting ? null : 'submit')}
+              style={{
+                display: 'grid', gridTemplateColumns: '22px 1fr', gap: 8,
+                width: '100%', textAlign: 'left', padding: '8px 16px',
+                background: submitting ? 'var(--panel-2)' : 'transparent',
+                borderLeft: `2px solid ${submitting ? 'var(--dc-bright)' : 'transparent'}`,
+                opacity: instanceId ? 1 : 0.3,
+                transition: 'background 180ms var(--ease)',
+              }}
+            >
+              <span className="mono" style={{
+                fontSize: 11, color: submitting ? 'var(--dc-bright)' : 'var(--dc)', paddingTop: 1,
+              }}>↑</span>
+              <span>
+                <span style={{
+                  display: 'block', fontSize: 12.5,
+                  color: submitting ? 'var(--ink-0)' : 'var(--ink-1)', fontWeight: submitting ? 550 : 450,
+                }}>Submit solution</span>
+                <span style={{ display: 'block', fontSize: 10.5, color: 'var(--ink-4)' }}>
+                  {instanceId ? `your .out for ${instanceId}` : 'choose a data set first'}
+                </span>
+              </span>
+            </button>
+          )
+          return [
             <button
               key={a.key}
               disabled={locked}
@@ -132,10 +197,26 @@ function Rail() {
                 }}>{a.name}</span>
                 <span style={{ display: 'block', fontSize: 10.5, color: 'var(--ink-4)' }}>{a.sub}</span>
               </span>
-            </button>
-          )
+            </button>,
+            submitStep,
+          ]
         })}
       </nav>
+
+      <div style={{ padding: '6px 0', borderTop: '1px solid var(--line)' }}>
+        {([['leaderboard', 'Leaderboard', 'players & groups'],
+           ['stats', 'Statistics', 'this run & the class'],
+           ...(user?.isAdmin ? [['admin', 'Admin', 'ranked data sets & groups']] as const : [])] as const).map(([p, name, sub]) => (
+          <button key={p} onClick={() => openPage(page === p ? null : p)} style={{
+            display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px',
+            background: page === p ? 'var(--panel-2)' : 'transparent',
+            borderLeft: `2px solid ${page === p ? 'var(--dc-bright)' : 'transparent'}`,
+          }}>
+            <span style={{ display: 'block', fontSize: 12.5, color: page === p ? 'var(--ink-0)' : 'var(--ink-1)', fontWeight: page === p ? 550 : 450 }}>{name}</span>
+            <span style={{ display: 'block', fontSize: 10.5, color: 'var(--ink-4)' }}>{sub}</span>
+          </button>
+        ))}
+      </div>
 
       <button
         onClick={toggleExplore}
@@ -150,6 +231,26 @@ function Rail() {
           {explore ? '◂ back to the story' : 'free explore  ·  E'}
         </span>
       </button>
+
+      {user && (
+        <div style={{
+          padding: '10px 16px', borderTop: '1px solid var(--line)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+        }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <span className="mono" style={{
+              fontSize: 11, color: 'var(--ca-bright)', border: '1px solid var(--ca-dim)',
+              width: 22, textAlign: 'center', padding: '2px 0',
+            }}>{user.group ?? '★'}</span>
+            <span style={{
+              fontSize: 12.5, color: 'var(--ink-1)', minWidth: 0,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>{user.username}</span>
+          </span>
+          <button className="lbl" onClick={() => void logout()}
+            style={{ color: 'var(--ink-3)', whiteSpace: 'nowrap', flex: '0 0 auto' }}>sign out</button>
+        </div>
+      )}
 
       <div style={{ padding: '10px 16px', borderTop: '1px solid var(--line)' }}>
         <div className="lbl mono" style={{ color: 'var(--ink-4)', lineHeight: 1.9 }}>
@@ -166,9 +267,18 @@ function TopBar() {
   const instanceId = useApp((s) => s.instanceId)
   const summary = useApp((s) => s.summary)
   const go = useApp((s) => s.go)
+  const page = useApp((s) => s.page)
+  const meta = useApp((s) => s.meta)
+  const user = useApp((s) => s.user)
+  const logout = useApp((s) => s.logout)
 
-  const title = explore ? 'Free explore' : ACTS[act].name
-  const sub = explore ? 'inspect any cache, endpoint or video' : ACTS[act].sub
+  const title = page === 'submit' ? 'Submit' : page === 'leaderboard' ? 'Leaderboard' : page === 'stats' ? 'Statistics' : page === 'admin' ? 'Admin'
+    : explore ? 'Free explore' : ACTS[act].name
+  const sub = page === 'submit' ? 'any language, any algorithm'
+    : page === 'leaderboard' ? 'best score per data set'
+    : page === 'stats' ? 'caches, endpoints, players, groups'
+    : page === 'admin' ? 'what counts, and who is where'
+    : explore ? 'inspect any cache, endpoint or video' : ACTS[act].sub
 
   return (
     <header style={{
@@ -181,7 +291,7 @@ function TopBar() {
           {title}
         </span>
         <span className="lbl" style={{ color: 'var(--ink-3)' }}>{sub}</span>
-        {instanceId && (
+        {instanceId && !page && (
           <span className="mono" style={{
             fontSize: 11, color: 'var(--ca-bright)', borderLeft: '1px solid var(--line)', paddingLeft: 12,
           }}>
@@ -191,10 +301,27 @@ function TopBar() {
                 {' '}· {summary.V.toLocaleString()}V · {summary.E}E · {summary.C}C
               </span>
             )}
+            {meta && meta.source !== 'solver' && (
+              <span style={{ color: 'var(--dc-bright)' }}>
+                {' '}· {meta.owner}'s {meta.source === 'trace' ? 'trace' : '.out'}
+              </span>
+            )}
           </span>
         )}
       </div>
-      <div style={{ display: 'flex', gap: 4 }}>
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+        {user && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 10 }}>
+            <span className="mono" style={{
+              fontSize: 10.5, border: `1px solid ${user.isAdmin ? 'var(--dc)' : 'var(--ca-dim)'}`,
+              color: user.isAdmin ? 'var(--dc-bright)' : 'var(--ca-bright)', padding: '1px 6px',
+            }}>{user.group === 'P' ? 'professor' : user.group ? `group ${user.group}` : 'admin'}{user.isAdmin && user.group ? ' · admin' : ''}</span>
+            <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>{user.username}</span>
+            <button onClick={() => void logout()} style={{
+              fontSize: 11.5, padding: '3px 10px', border: '1px solid var(--line-2)', color: 'var(--ink-1)',
+            }}>Log out</button>
+          </span>
+        )}
         <NavBtn onClick={() => go(-1)} disabled={act === 0}>←</NavBtn>
         <NavBtn onClick={() => go(1)} disabled={act === ACTS.length - 1 || !instanceId}>→</NavBtn>
       </div>
@@ -212,13 +339,14 @@ function NavBtn({ children, ...p }: { children: ReactNode } & React.ButtonHTMLAt
 
 function StatusStrip({ instanceId, meta, hasResult }: {
   instanceId: string | null
-  meta: { status: string; cached: boolean; solveSeconds: number | null } | null
+  meta: { status: string; cached: boolean; solveSeconds: number | null; source: string; owner: string | null } | null
   hasResult: boolean
 }) {
   if (!instanceId) return null
   const label = !meta ? 'idle'
     : meta.status === 'done'
-      ? (meta.cached ? 'replay · prewarmed' : `solved live in ${meta.solveSeconds}s`)
+      ? (meta.source !== 'solver' ? `submission by ${meta.owner}`
+        : meta.cached ? 'replay · prewarmed' : `solved live in ${meta.solveSeconds}s`)
       : meta.status
   const live = meta && meta.status !== 'done' && meta.status !== 'error'
   return (

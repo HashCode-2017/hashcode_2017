@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react'
 import { useApp } from '../lib/store'
 import { compact, int } from '../lib/format'
 import { Label, Num, Panel, SplitBar, Stat } from '../components/Kit'
 import { LatencyCompare, RankBars, Treemap } from '../viz/Charts'
 import { NetworkCanvas } from '../viz/NetworkCanvas'
+import { NeedSubmission } from './NeedSubmission'
 
 /**
  * Act 4. Where every request actually lands once the caches are full.
@@ -15,7 +17,17 @@ export function Routing() {
   const result = useApp((s) => s.result)
   const topo = useApp((s) => s.topology)
   const streaming = useApp((s) => s.streaming)
+  const [big, setBig] = useState(false)
+  const needSubmission = useApp((s) => s.needSubmission)
 
+  useEffect(() => {
+    if (!big) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setBig(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [big])
+
+  if (!result && needSubmission) return <NeedSubmission />
   if (!result || !topo) {
     return (
       <div style={{ display: 'grid', placeItems: 'center', height: '100%' }}>
@@ -30,18 +42,44 @@ export function Routing() {
     .sort((a, b) => (b.before - b.after) - (a.before - a.after)).slice(0, 8)
   const busiest = [...result.caches].sort((a, b) => b.requests - a.requests).slice(0, 8)
 
+  const graph = topo.tier === 'graph'
+  // The canvas lays itself out once, at mount: key it by size so expanding
+  // re-runs the layout at the new dimensions instead of stretching the old one.
+  const network = graph && (
+    <Panel
+      title="the network, now routed"
+      right={
+        <button className="lbl" onClick={() => setBig((b) => !b)} style={{ color: 'var(--ca-bright)' }}>
+          {big ? 'shrink · esc' : 'expand ⤢'}
+        </button>
+      }
+      flush
+      style={{ minHeight: 0, height: '100%' }}
+    >
+      <NetworkCanvas key={big ? 'big' : 'normal'} topo={topo} routed placement={result.placement} />
+    </Panel>
+  )
+
+  if (big && network) {
+    return <div style={{ height: '100%', minHeight: 0 }}>{network}</div>
+  }
+
   return (
     <div style={{
       display: 'grid', gridTemplateColumns: '1.35fr 1fr var(--tele)',
       gap: 1, background: 'var(--line)', height: '100%', minHeight: 0,
     }}>
-      <div style={{ display: 'grid', gridTemplateRows: '1fr auto', gap: 1, minHeight: 0 }}>
+      <div style={{
+        display: 'grid', gridTemplateRows: graph ? 'minmax(320px, 1.6fr) auto' : '1fr',
+        gap: 1, minHeight: 0,
+      }}>
+        {network}
         <Panel title="latency actually served, weighted by request volume" style={{ minHeight: 0 }}>
-          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <LatencyCompare
               before={result.latencyBefore}
               after={result.latencyAfter}
-              height={168}
+              height={graph ? 120 : 168}
             />
             <div>
               <Label style={{ marginBottom: 8 }}>where the request volume goes</Label>
@@ -49,12 +87,6 @@ export function Routing() {
             </div>
           </div>
         </Panel>
-
-        {topo.tier === 'graph' && (
-          <Panel title="the network, now routed" flush style={{ height: 250 }}>
-            <NetworkCanvas topo={topo} routed placement={result.placement} />
-          </Panel>
-        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateRows: 'auto auto 1fr', gap: 1, minHeight: 0 }}>

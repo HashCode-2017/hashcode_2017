@@ -10,8 +10,9 @@ import json
 import os
 import threading
 import time
+import uuid
 
-from . import ROOT, instances as inst_mod, analysis
+from . import ROOT, instances as inst_mod, analysis, replay, db
 from solution import solve
 
 RUNS_DIR = os.path.join(ROOT, ".runs")
@@ -24,10 +25,12 @@ _lock = threading.Lock()
 
 
 class Run:
-    def __init__(self, run_id, instance_id, rounds):
+    def __init__(self, run_id, instance_id, rounds, source="solver", owner=None):
         self.id = run_id
         self.instance = instance_id
         self.rounds = rounds
+        self.source = source            # solver | trace | out
+        self.owner = owner              # username for uploaded submissions
         self.status = "queued"          # queued|parsing|solving|analysing|done|error
         self.error = None
         self.events = []
@@ -47,6 +50,7 @@ class Run:
     def meta(self):
         return {
             "id": self.id, "instance": self.instance, "rounds": self.rounds,
+            "source": self.source, "owner": self.owner,
             "status": self.status, "error": self.error, "cached": self.cached,
             "eventCount": len(self.events),
             "parseSeconds": self.parse_seconds,
@@ -74,12 +78,24 @@ def is_prewarmed(instance_id, rounds=5):
 
 
 def _load_from_disk(run_id):
+    """From the disk cache, else from the database (refilling the cache)."""
     path = cache_path(run_id)
-    if not os.path.exists(path):
-        return None
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    run = Run(run_id, data["instance"], data["rounds"])
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        try:
+            text = db.load_run(run_id)
+        except Exception:
+            text = None
+        if text is None:
+            return None
+        os.makedirs(RUNS_DIR, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+        data = json.loads(text)
+    run = Run(run_id, data["instance"], data["rounds"],
+              data.get("source", "solver"), data.get("owner"))
     run.status = "done"
     run.events = data["events"]
     run.result = data["result"]
@@ -91,14 +107,28 @@ def _load_from_disk(run_id):
 
 
 def _persist(run: Run):
+    text = json.dumps(run.record(), separators=(",", ":"))
     os.makedirs(RUNS_DIR, exist_ok=True)
     tmp = cache_path(run.id) + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(run.record(), f, separators=(",", ":"))
+        f.write(text)
     os.replace(tmp, cache_path(run.id))
+    # The copy that outlives the server's disk. A failure here must not lose
+    # the run that was just computed, so it is reported but not raised.
+    try:
+        db.save_run(run.id, run.instance, text)
+    except Exception as exc:
+        print(f"warning: could not store run {run.id} in the database: {exc}")
 
 
-def _work(run: Run):
+def _solver(inst, run):
+    return solve(inst, max_rounds=run.rounds, on_event=run.emit), None
+
+
+def _work(run: Run, produce=_solver, on_done=None):
+    """Parse, produce a placement, analyse. `produce(inst, run)` returns
+    (placement, extra) and emits events as it goes; `extra` is merged into the
+    result. The reference solver is just the default producer."""
     try:
         run.status = "parsing"
         run.emit("phase", {"phase": "parsing"})
@@ -114,7 +144,7 @@ def _work(run: Run):
         run.status = "solving"
         run.emit("phase", {"phase": "solving"})
         t0 = time.time()
-        placed = solve(inst, max_rounds=run.rounds, on_event=run.emit)
+        placed, extra = produce(inst, run)
         run.solve_seconds = round(time.time() - t0, 3)
 
         run.status = "analysing"
@@ -123,6 +153,8 @@ def _work(run: Run):
         run.result = analysis.analyse(inst, placed)
         run.result["submission"] = analysis.submission_text(inst, placed)
         run.result["validation"] = analysis.validate(inst, placed)
+        if extra:
+            run.result.update(extra)
         run.analyse_seconds = round(time.time() - t0, 3)
 
         run.emit("done", {
@@ -134,6 +166,8 @@ def _work(run: Run):
         # that status as the signal to move on, and a daemon thread still
         # writing when the process exits leaves a truncated .tmp behind.
         _persist(run)
+        if on_done:
+            on_done(run)
         run.status = "done"
     except Exception as exc:                       # surface it, don't swallow it
         run.status = "error"
@@ -158,6 +192,36 @@ def start(instance_id, rounds=5, force=False):
 
     threading.Thread(target=_work, args=(run,), daemon=True, name="solve:" + run_id).start()
     return run, True
+
+
+def start_submission(instance_id, out_text, trace_text, owner, on_done=None):
+    """Validate the files up front (so a bad upload is a 400, not a failed
+    job), then replay them on a worker thread like any other run."""
+    inst = inst_mod.load(instance_id)
+    out_placed = replay.parse_out(inst, out_text)
+    ops = replay.parse_trace(inst, trace_text) if trace_text and trace_text.strip() else None
+
+    def produce(inst, run):
+        if ops is None:
+            placed, problems, steps = replay.replay(inst, replay.ops_from_out(out_placed), run.emit)
+            return placed, {"trace": {"provided": False, "steps": steps}}
+        trace_placed, problems, steps = replay.replay(inst, ops, run.emit)
+        diffs = replay.compare(trace_placed, out_placed)
+        # The .out is what gets scored, whatever the trace says.
+        placed = {c: set(vs) for c, vs in out_placed.items()}
+        return placed, {"trace": {
+            "provided": True, "steps": steps, "problems": problems,
+            "consistent": not diffs, "differences": diffs[:20],
+            "differenceCount": len(diffs),
+        }}
+
+    run_id = f"sub-{uuid.uuid4().hex[:10]}"
+    run = Run(run_id, instance_id, 0, "trace" if ops else "out", owner)
+    with _lock:
+        _runs[run_id] = run
+    threading.Thread(target=_work, args=(run, produce, on_done), daemon=True,
+                     name="replay:" + run_id).start()
+    return run
 
 
 def get(run_id):

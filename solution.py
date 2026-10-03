@@ -711,6 +711,9 @@ def main():
                          help="max entries shown per list in the log (0 = show everything)")
     parser.add_argument("--show-input", action="store_true",
                          help="also log the parsed input data")
+    parser.add_argument("--trace", metavar="FILE",
+                         help="also write every placement and eviction, in order, "
+                              "for the class console (see CLASS.md)")
     args = parser.parse_args()
 
     inst = parse_input(args.input_file)
@@ -718,8 +721,21 @@ def main():
         log_input(inst, args.input_file, args.log_limit)
         print()
     print(f"=== DATA: {inst.V:,} videos, {inst.E:,} endpoints\n")
+    trace = open(args.trace, "w", encoding="ascii", newline="\n") if args.trace else None
+
+    def on_event(kind, payload=None):
+        if kind == "round_start":
+            trace.write(f"# round {payload['round'] + 1}\n")
+        elif kind == "place":
+            trace.write(f"+ {payload['cache']} {payload['video']}\n")
+        elif kind == "evict":
+            trace.write(f"- {payload['cache']} {payload['video']}\n")
+
     placed = solve(inst, max_rounds=args.rounds, evict=not args.no_evict,
-                   strategy=args.strategy, swap=not args.no_swap)
+                   strategy=args.strategy, swap=not args.no_swap,
+                   on_event=on_event if trace else None)
+    if trace:
+        trace.close()
     write_output(args.output_file, placed, inst.C)
     log_placement(inst, placed, args.output_file, args.log_limit)
     log_score(inst, placed)

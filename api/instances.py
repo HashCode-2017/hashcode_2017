@@ -6,6 +6,7 @@ Two levels of detail:
   * `load(id)` does the full `parse_input` and keeps the result in a small LRU,
     because parsing `kittens.in` is not something we want to repeat per request.
 """
+import csv
 import os
 import threading
 from collections import OrderedDict
@@ -22,6 +23,25 @@ CATALOG = [
     ("trending_today", "instances/trending_today.in", "Every endpoint sees every cache"),
     ("kittens", "instances/kittens.in", "The full-scale data set"),
 ]
+
+# The four data sets of the real qualification round. The overall ranking is
+# the sum of each player's best score on these, exactly as Hash Code scored it.
+OFFICIAL = ["me_at_the_zoo", "videos_worth_spreading", "trending_today", "kittens"]
+
+
+def _generated():
+    """Benchmark data sets from `generated_instances/`, described by its manifest."""
+    folder = os.path.join(ROOT, "generated_instances")
+    manifest = os.path.join(folder, "manifest.csv")
+    if not os.path.exists(manifest):
+        return []
+    with open(manifest, newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    return [(r["name"], f"generated_instances/{r['name']}.in", f"Generated: {r['tag']}")
+            for r in rows]
+
+
+CATALOG += _generated()
 
 # A node-link drawing stops meaning anything long before this, but these two
 # bounds are where it stops being *drawable* at all.
@@ -79,6 +99,7 @@ def list_instances():
             "bytes": os.path.getsize(path),
             "tier": tier_for(head["E"], head["C"], None),
             "loaded": iid in _cache,
+            "official": iid in OFFICIAL,
         }
         entry.update(head)
         out.append(entry)

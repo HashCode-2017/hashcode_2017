@@ -9,3 +9,6 @@ ui/tsconfig.tsbuildinfo
 *.pdf
 *.txt
 *.in
+.data/
+.env
+!requirements.txt

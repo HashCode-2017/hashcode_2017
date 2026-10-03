@@ -5,6 +5,7 @@ import { compact, int } from '../lib/format'
 import { Chip, Label, Meter, Num, Panel, Stat } from '../components/Kit'
 import { SolveStage } from '../viz/SolveStage'
 import { Loading } from './Ingest'
+import { NeedSubmission } from './NeedSubmission'
 
 const SPEEDS = [0.25, 0.5, 1, 2, 4, 8]
 
@@ -26,6 +27,7 @@ export function Solve() {
   const streaming = useApp((s) => s.streaming)
   const result = useApp((s) => s.result)
   const startRun = useApp((s) => s.startRun)
+  const needSubmission = useApp((s) => s.needSubmission)
 
   const [playing, setPlaying] = useState(true)
   const [speed, setSpeed] = useState(1)
@@ -70,6 +72,7 @@ export function Solve() {
     setPlaying(true)
   }, [player])
 
+  if (!player && needSubmission) return <NeedSubmission />
   if (!player || !topo) return <Loading />
 
   const total = player.events.length
@@ -153,8 +156,10 @@ export function Solve() {
         right={
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {waiting && <Chip tone="dc">solver still working…</Chip>}
-            {meta && meta.cached && <Chip tone="ca">prewarmed replay</Chip>}
-            {meta && !meta.cached && streaming && <Chip tone="dc">solving live</Chip>}
+            {meta && meta.source === 'trace' && <Chip tone="dc">{meta.owner}'s trace</Chip>}
+            {meta && meta.source === 'out' && <Chip tone="idle">final placement · no trace</Chip>}
+            {meta && meta.source === 'solver' && meta.cached && <Chip tone="ca">prewarmed replay</Chip>}
+            {meta && meta.source === 'solver' && !meta.cached && streaming && <Chip tone="dc">solving live</Chip>}
             <span className="lbl mono" style={{ color: 'var(--ink-3)' }}>
               {int(Math.min(player.cursor, total))} / {int(total)} events
             </span>
@@ -176,7 +181,8 @@ export function Solve() {
             player={player}
             restart={restart}
             atEnd={atEnd}
-            onRerun={() => { frac.current = 0; void startRun(true); setPlaying(true) }}
+            onRerun={meta && meta.source !== 'solver' ? undefined
+              : () => { frac.current = 0; void startRun(true); setPlaying(true) }}
           />
         </div>
       </Panel>
@@ -213,6 +219,12 @@ export function Solve() {
             <Num value={player.lastTouched} />
           </Stat>
 
+          {result && atEnd && meta && meta.source !== 'solver' && (
+            <button onClick={() => useApp.getState().setAct(5)} style={{
+              width: '100%', margin: '10px 0 4px', padding: '9px 0', fontSize: 12.5,
+              border: '1px solid var(--ca)', background: 'var(--ca-dim)', color: 'var(--ink-0)',
+            }}>see the submission &amp; your rank →</button>
+          )}
           {result && atEnd && (
             <>
               <Stat label="share of the reachable ceiling" accent="ca"
@@ -297,7 +309,7 @@ function Controls({ playing, setPlaying, speed, setSpeed, frac, player, restart,
   player: { events: unknown[]; cursor: number; seek: (n: number, t: number) => void }
   restart: () => void
   atEnd: boolean
-  onRerun: () => void
+  onRerun?: () => void
 }) {
   const total = Math.max(1, player.events.length)
   return (
@@ -344,7 +356,8 @@ function Controls({ playing, setPlaying, speed, setSpeed, frac, player, restart,
         ))}
       </div>
 
-      <button onClick={onRerun} className="lbl" style={{ color: 'var(--ink-3)' }}>
+      <button onClick={onRerun} disabled={!onRerun} className="lbl"
+        style={{ color: 'var(--ink-3)', visibility: onRerun ? 'visible' : 'hidden' }}>
         solve again ↻
       </button>
     </div>

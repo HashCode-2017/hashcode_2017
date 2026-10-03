@@ -1,0 +1,11 @@
+{
+  "name": "hashcode-2017-console",
+  "private": true,
+  "description": "Build step for Heroku: the Node buildpack runs heroku-postbuild, which builds the UI that the Python app serves.",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "heroku-postbuild": "cd ui && npm ci --include=dev && npm run build"
+  }
+}
