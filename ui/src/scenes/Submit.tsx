@@ -143,6 +143,31 @@ export function Submit() {
           <span className="mono">.out</span> does. The <span className="mono">.out</span> is always
           what gets scored.
         </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 18, maxWidth: 760 }}>
+          <Compare
+            title=".out only — what your solution is"
+            tone="idle"
+            points={[
+              'The .out says what ends up in each cache, not the order you got there.',
+              'To animate it, the console invents an order: most valuable first (latency saved per MB).',
+              'That animation is a presentation of your final result, not your algorithm. It is labelled "no trace · most valuable first".',
+            ]}
+          />
+          <Compare
+            title=".out + .trace — how your algorithm got there"
+            tone="ca"
+            points={[
+              'The placement act replays your own decisions, in your order, removals and round markers included.',
+              'Every step is checked: cache overflow, a video added twice, a removal of something not there.',
+              'You see what your algorithm picks first, when it evicts, and how the score grows step by step.',
+            ]}
+          />
+        </div>
+        <p style={{ color: 'var(--ink-3)', maxWidth: 760, fontSize: 12, marginTop: 10, lineHeight: 1.6 }}>
+          Either way the score, the ranking, routing, the submission check and the statistics are
+          identical: they all come from the <span className="mono">.out</span> alone.
+        </p>
       </div>
 
       <Panel title={user?.group ? `group ${user.group} · shared submissions` : 'your submissions'} style={{ minHeight: 0 }} flush>
@@ -231,6 +256,24 @@ function Format({ title, lines }: { title: string; lines: [string, string][] }) 
           <span style={{ color: 'var(--ink-3)' }}>{note}</span>
         </div>
       ))}
+    </div>
+  )
+}
+
+function Compare({ title, points, tone }: { title: string; points: string[]; tone: 'idle' | 'ca' }) {
+  return (
+    <div style={{
+      border: `1px solid ${tone === 'ca' ? 'var(--ca-dim)' : 'var(--line-2)'}`,
+      background: 'var(--panel)', padding: '10px 12px',
+    }}>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: tone === 'ca' ? 'var(--ca-bright)' : 'var(--ink-1)', marginBottom: 8 }}>
+        {title}
+      </div>
+      <ul style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {points.map((p) => (
+          <li key={p} style={{ fontSize: 11.5, color: 'var(--ink-2)', lineHeight: 1.5 }}>{p}</li>
+        ))}
+      </ul>
     </div>
   )
 }
