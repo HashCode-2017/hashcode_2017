@@ -52,6 +52,7 @@ Run with --help for every parameter.
 
 import argparse
 import csv
+import itertools
 import math
 import os
 import random
@@ -97,6 +98,8 @@ class InstanceSpec:
     endpoint_coverage: float = 1.0  # fraction of endpoints that make requests
     request_min: int = 1            # request count range per description
     request_max: int = 5000
+    count_shape: str = "uniform"   # uniform | heavy | very_heavy | high | saturated
+    balanced: bool = False         # spread request lines evenly over endpoints
 
     # Derived tag for manifest -------------------------------------------
     tag: str = ""                   # short description of what this tests
@@ -320,6 +323,9 @@ def generate_instance(spec: InstanceSpec, rng: random.Random) -> str:
 
     # Build Zipf weights over videos (rank = position in requested_videos)
     weights = zipf_weights(len(requested_videos), spec.zipf_a)
+    # Accumulated once: rng.choices(weights=...) rebuilds this table on every
+    # call, O(V) per draw. Passing it pre-built gives the very same draws.
+    cum_weights = list(itertools.accumulate(weights))
 
     requests = []
     seen_pairs = set()
@@ -329,14 +335,21 @@ def generate_instance(spec: InstanceSpec, rng: random.Random) -> str:
     while len(requests) < spec.R and attempts < max_attempts:
         attempts += 1
         # Pick a video weighted by Zipf
-        v = rng.choices(requested_videos, weights=weights, k=1)[0]
+        v = rng.choices(requested_videos, cum_weights=cum_weights, k=1)[0]
         # Pick an endpoint uniformly from active ones
-        e = rng.choice(active_endpoints)
+        if spec.balanced:
+            e = active_endpoints[(len(requests) + attempts) % len(active_endpoints)]
+        else:
+            e = rng.choice(active_endpoints)
         pair = (v, e)
         if pair in seen_pairs:
             continue
         seen_pairs.add(pair)
-        n = rng.randint(spec.request_min, spec.request_max)
+        if spec.count_shape == "uniform":
+            n = rng.randint(spec.request_min, spec.request_max)
+        else:
+            import models  # noqa: the shared count shapes
+            n = models._count(rng, spec.request_min, spec.request_max, spec.count_shape)
         requests.append((v, e, n))
 
     R = len(requests)

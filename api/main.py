@@ -305,7 +305,7 @@ import sys as _sys
 _sys.path.insert(0, os.path.join(ROOT, "generated_instances"))
 import models as gen_models  # noqa: E402  -- generated_instances/models.py
 
-WEB_MAX_R = 200_000            # keeps generation and solving responsive on one dyno
+WEB_MAX_R = 1_000_000          # the official limit; a 1M-line instance builds in a few seconds
 WEB_MAX_PER_GROUP = 10
 
 
@@ -318,7 +318,8 @@ class GenerateRequest(BaseModel):
 
 @app.get("/api/generator")
 def api_generator(user=Depends(current_user)):
-    return {"models": gen_models.describe(), "maxR": WEB_MAX_R, "perGroup": WEB_MAX_PER_GROUP}
+    return {"models": gen_models.describe(), "presets": gen_models.PRESETS,
+            "maxR": WEB_MAX_R, "perGroup": WEB_MAX_PER_GROUP}
 
 
 @app.post("/api/instances/generate")
@@ -338,14 +339,21 @@ def api_generate(body: GenerateRequest, user=Depends(current_user)):
         raise HTTPException(400, f"at most {WEB_MAX_R:,} request lines from the console "
                                  "(use generate.py locally for bigger ones)")
     seed = body.seed if body.seed is not None else _secrets.randbelow(10**9)
+    if lines > 200_000:
+        inst_mod.drop_parsed()      # make room: a parsed big instance holds ~150 MB
     try:
         text, params = gen_models.build(body.model, body.params, seed=seed)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
 
-    label = (body.name or "").strip()[:40] or f"{body.model} {seed}"
-    slug = _re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")[:32] or body.model
-    instance_id = f"gen_{slug}_{_secrets.token_hex(2)}"
+    # Default name: the header numbers, V_E_R_C (so the download is V_E_R_C.in).
+    V, E, R, C, _X = text.split("\n", 1)[0].split()
+    label = (body.name or "").strip()[:40] or f"{V}_{E}_{R}_{C}"
+    base = _re.sub(r"[^A-Za-z0-9]+", "_", label).strip("_")[:40] or f"{V}_{E}_{R}_{C}"
+    taken = {r["id"] for r in inst_mod.list_instances()}
+    instance_id, n = base, 2
+    while instance_id in taken:
+        instance_id, n = f"{base}_{n}", n + 1
     db.save_generated({
         "id": instance_id, "label": label, "model": body.model, "params": params, "seed": seed,
         "owner_group": group, "created_by": user["username"], "header": text.split("\n", 1)[0],

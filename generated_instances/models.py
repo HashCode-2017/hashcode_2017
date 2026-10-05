@@ -114,15 +114,25 @@ def _per_endpoint(R, E, noise, rng, cap):
     return counts
 
 
-def _count(rng, lo, hi, heavy=False):
-    if heavy:          # most counts small, a long tail of big ones
-        return min(MAX_COUNT, lo + int((hi - lo) * rng.random() ** 2))
-    return rng.randint(lo, hi)
+def _count(rng, lo, hi, shape="uniform"):
+    """A request count in [lo, hi].
+    uniform: flat; heavy: mostly small, long tail; very_heavy: mostly the
+    minimum; high: mostly near the maximum; saturated: nearly always the
+    maximum (what merging many repeated lines of one pair produces once
+    capped at the official 10000)."""
+    u = rng.random()
+    if shape == "heavy":
+        x = lo + (hi - lo) * u ** 2
+    elif shape == "very_heavy":
+        x = lo + (hi - lo) * u ** 4
+    elif shape == "high":
+        x = hi - (hi - lo) * u ** 2
+    elif shape == "saturated":
+        x = hi - (hi - lo) * u ** 8
+    else:
+        return rng.randint(lo, hi)
+    return max(lo, min(hi, MAX_COUNT, int(round(x))))
 
-
-# ---------------------------------------------------------------------------
-# Models
-# ---------------------------------------------------------------------------
 
 def build_dejavu(p, rng):
     V, E, C = p["V"], p["E"], p["C"]
@@ -141,29 +151,48 @@ def build_dejavu(p, rng):
         while len(chosen) < r_e:
             chosen.add(rng.randrange(V))
         for v in chosen:
-            requests.append((v, e, _count(rng, p["request_min"], p["request_max"], heavy=True)))
+            requests.append((v, e, _count(rng, p["request_min"], p["request_max"], p["count_shape"])))
     return to_text(V, E, C, p["X"], sizes, endpoints, requests)
+
+
+def _sizes(p, V, rng):
+    lo, hi = p["size_min"], p["size_max"]
+    pat = p["size_pattern"]
+    if pat == "decreasing":
+        return [max(lo, min(hi, int(round(hi - (hi - lo) * v / max(1, V - 1) * rng.uniform(0.9, 1.1)))))
+                for v in range(V)]
+    if pat == "bimodal":
+        small_hi = lo + max(1, (hi - lo) // 10)
+        return [rng.randint(lo, small_hi) if rng.random() < 0.8
+                else rng.randint(max(lo, int(hi * 0.8)), hi) for _ in range(V)]
+    if pat == "lambda":
+        # The Universal Lambda example's formula: max(1, 1000 - id + randint(0, id)).
+        # Big for the first ids, then collapses to the minimum for most videos.
+        return [max(lo, min(hi, hi - v + rng.randint(0, v))) for v in range(V)]
+    if pat == "two_halves":
+        # First half small (up to 50 MB); second half climbs from half the
+        # maximum to the maximum over its first 30%, then stays at the maximum.
+        half = V // 2
+        small_hi = max(lo, min(hi, 50))
+        ramp = max(1, int(0.3 * (V - half)))
+        return [rng.randint(lo, small_hi) if v < half
+                else max(lo, min(hi, int(round(hi / 2 + (hi / 2) * min(1.0, (v - half) / ramp)))))
+                for v in range(V)]
+    return [rng.randint(lo, hi) for _ in range(V)]
 
 
 def build_patterned(p, rng):
     V, E, C = p["V"], p["E"], p["C"]
-    lo, hi = p["size_min"], p["size_max"]
+    sizes = _sizes(p, V, rng)
 
-    # Video sizes.
-    if p["size_pattern"] == "decreasing":
-        sizes = [max(1, min(MAX_SIZE, int(round(hi - (hi - lo) * v / max(1, V - 1)
-                                                  * rng.uniform(0.9, 1.1))))) for v in range(V)]
-    elif p["size_pattern"] == "bimodal":
-        small_hi = lo + max(1, (hi - lo) // 10)
-        sizes = [rng.randint(lo, small_hi) if rng.random() < 0.8
-                 else rng.randint(max(lo, int(hi * 0.8)), hi) for _ in range(V)]
-    else:
-        sizes = [rng.randint(lo, hi) for _ in range(V)]
-
-    # Topology: random links, or a 1-D geography where latency grows with distance.
+    # Topology. random: each endpoint draws its own caches (how many varies,
+    # averaging density x C); distance: a 1-D geography, nearest caches, latency
+    # grows with distance; shared: every endpoint reaches the same caches.
     k = max(0, min(C, int(round(p["density"] * C))))
     cache_pos = [(c + 0.5) / C for c in range(C)]
     ep_pos = [rng.random() for _ in range(E)]
+    shared = [round(i * C / k) % C for i in range(k)] if k else []
+    shared = sorted(set(shared))
     endpoints = []
     for e in range(E):
         ld = rng.randint(p["dc_latency_min"], p["dc_latency_max"])
@@ -173,27 +202,48 @@ def build_patterned(p, rng):
             top = min(p["cache_latency_max"], MAX_LC, ld - 1)
             low = min(max(1, p["cache_latency_min"]), top)
             links = [(c, low + int(round((top - low) * abs(cache_pos[c] - ep_pos[e]) / far))) for c in near]
+        elif p["latency_pattern"] == "shared":
+            links = [(c, _cache_latency(rng, ld, p["cache_latency_min"], p["cache_latency_max"])) for c in shared]
         else:
-            links = _random_links(rng, C, k, ld, p["cache_latency_min"], p["cache_latency_max"])
+            k_e = sum(rng.random() < p["density"] for _ in range(C))
+            links = _random_links(rng, C, k_e, ld, p["cache_latency_min"], p["cache_latency_max"])
         endpoints.append((ld, links))
 
     # Demand.
+    shape = p["count_shape"]
+    lo, hi = p["request_min"], p["request_max"]
     requests = []
-    per_e = _per_endpoint(p["R"], E, 0.1, rng, V)
-    if p["demand_pattern"] == "checkerboard":
-        # Even endpoints want odd videos, a lot; everyone else asks for a little of anything.
+    pat = p["demand_pattern"]
+    if pat == "checkerboard":
+        # As in the Universal Lambda example: even endpoints want every odd
+        # video a lot, and also ask a little for even ones; odd endpoints ask a
+        # little for anything. Even endpoints get 1.5x the request lines.
+        weights = [1.5 if e % 2 == 0 else 1.0 for e in range(E)]
+        scale = p["R"] / sum(weights)
         odd = list(range(1, V, 2)) or [0]
-        for e, r_e in enumerate(per_e):
+        even = list(range(0, V, 2)) or [0]
+        for e in range(E):
+            r_e = max(1, min(V, int(round(weights[e] * scale))))
             if e % 2 == 0:
-                for v in rng.sample(odd, min(r_e, len(odd))):
-                    requests.append((v, e, rng.randint(max(1, int(p["request_max"] * 0.8)), p["request_max"])))
+                n_odd = min(len(odd), int(round(r_e * 2 / 3)))
+                for v in rng.sample(odd, n_odd):
+                    requests.append((v, e, rng.randint(max(lo, int(hi * 0.8)), hi)))
+                for v in rng.sample(even, min(len(even), r_e - n_odd)):
+                    requests.append((v, e, rng.randint(lo, min(hi, lo + 99))))
             else:
                 for v in rng.sample(range(V), r_e):
-                    requests.append((v, e, rng.randint(p["request_min"], min(p["request_max"], p["request_min"] + 100))))
-    elif p["demand_pattern"] == "local":
+                    requests.append((v, e, rng.randint(lo, min(hi, lo + 99))))
+    elif pat == "same_parity":
+        # Endpoints only want videos with the same parity as themselves.
+        pools = [list(range(0, V, 2)) or [0], list(range(1, V, 2)) or [0]]
+        for e, r_e in enumerate(_per_endpoint(p["R"], E, 0.05, rng, V)):
+            pool = pools[e % 2]
+            for v in rng.sample(pool, min(r_e, len(pool))):
+                requests.append((v, e, _count(rng, lo, hi, shape)))
+    elif pat == "local":
         # Each endpoint mostly wants the videos "near" it: a window of the catalog.
         width = max(1, int(p["local_width"] * V))
-        for e, r_e in enumerate(per_e):
+        for e, r_e in enumerate(_per_endpoint(p["R"], E, 0.1, rng, V)):
             center = int(ep_pos[e] * V)
             chosen = set()
             while len(chosen) < r_e:
@@ -203,20 +253,19 @@ def build_patterned(p, rng):
                     v = rng.randrange(V)
                 chosen.add(v)
             for v in chosen:
-                requests.append((v, e, _count(rng, p["request_min"], p["request_max"])))
+                requests.append((v, e, _count(rng, lo, hi, shape)))
     else:  # zipf
         order = list(range(V))
         rng.shuffle(order)
         weights = [1.0 / (r + 1) ** p["zipf"] for r in range(V)] if p["zipf"] > 0 else None
-        for e, r_e in enumerate(per_e):
+        for e, r_e in enumerate(_per_endpoint(p["R"], E, 0.1, rng, V)):
             chosen = set()
             attempts = 0
             while len(chosen) < r_e and attempts < 20 * r_e:
                 attempts += 1
-                draw = rng.choices(order, weights=weights, k=max(1, r_e - len(chosen)))
-                chosen.update(draw)
+                chosen.update(rng.choices(order, weights=weights, k=max(1, r_e - len(chosen))))
             for v in list(chosen)[:r_e]:
-                requests.append((v, e, _count(rng, p["request_min"], p["request_max"])))
+                requests.append((v, e, _count(rng, lo, hi, shape)))
     return to_text(V, E, C, p["X"], sizes, endpoints, requests)
 
 
@@ -253,6 +302,7 @@ def build_trap(p, rng):
 def build_random(p, rng):
     """The original generator (generate.py): one knob per structural axis."""
     import generate                      # lazy: generate.py imports this module
+    p = dict(p, balanced=p.get("balanced") == "yes")
     spec = generate.InstanceSpec(name="console", **p)
     problems = generate.validate_spec(spec)
     if problems:
@@ -295,6 +345,10 @@ MODELS: Dict[str, dict] = {
             _f("cache_latency_max", "max cache latency", "int", 200, 1, MAX_LC, advanced=True),
             _f("request_min", "min count per request", "int", 1, 1, MAX_COUNT, advanced=True),
             _f("request_max", "max count per request", "int", 5_000, 1, MAX_COUNT, advanced=True),
+            _f("count_shape", "count distribution", "choice", "uniform",
+               choices=["uniform", "heavy", "very_heavy", "high", "saturated"], advanced=True),
+            _f("balanced", "spread requests evenly over endpoints", "choice", "no",
+               choices=["no", "yes"], advanced=True),
         ],
     ),
     "dejavu": dict(
@@ -319,6 +373,9 @@ MODELS: Dict[str, dict] = {
             _f("cache_latency_max", "max cache latency", "int", 500, 1, MAX_LC, advanced=True),
             _f("request_min", "min count per request", "int", 2, 1, MAX_COUNT, advanced=True),
             _f("request_max", "max count per request", "int", 10_000, 1, MAX_COUNT, advanced=True),
+            _f("count_shape", "count distribution", "choice", "heavy",
+               choices=["uniform", "heavy", "very_heavy", "high", "saturated"], advanced=True,
+               help="high = mostly near the maximum, like many repeated requests merged"),
         ],
     ),
     "patterned": dict(
@@ -333,14 +390,18 @@ MODELS: Dict[str, dict] = {
             _f("X", "cache size (MB)", "int", 5_000, 1, MAX_X),
             _f("R", "request lines", "int", 20_000, 1, MAX_R),
             _f("size_pattern", "video sizes", "choice", "decreasing",
-               choices=["uniform", "decreasing", "bimodal"],
-               help="decreasing: bigger ids are smaller; bimodal: mostly small, some huge"),
+               choices=["uniform", "decreasing", "bimodal", "lambda", "two_halves"],
+               help="decreasing: bigger ids are smaller; bimodal: mostly small, some huge; "
+                    "lambda: the Universal Lambda formula (most videos tiny); "
+                    "two_halves: first half small, second half big and growing"),
             _f("demand_pattern", "demand", "choice", "local",
-               choices=["zipf", "checkerboard", "local"],
-               help="checkerboard: even endpoints want odd videos; local: endpoints want videos near them"),
-            _f("latency_pattern", "latency geometry", "choice", "distance",
-               choices=["random", "distance"],
-               help="distance: endpoints reach their nearest caches, latency grows with distance"),
+               choices=["zipf", "checkerboard", "local", "same_parity"],
+               help="checkerboard: even endpoints want odd videos a lot; local: endpoints want videos "
+                    "near them; same_parity: endpoints only want videos of their own parity"),
+            _f("latency_pattern", "cache topology", "choice", "distance",
+               choices=["random", "distance", "shared"],
+               help="random: each endpoint its own caches; distance: nearest caches, latency grows "
+                    "with distance; shared: every endpoint reaches the same caches"),
             _f("density", "share of caches per endpoint", "float", 0.2, 0.0, 1.0),
             _f("zipf", "Zipf exponent (zipf demand)", "float", 1.0, 0.0, 3.0, advanced=True),
             _f("local_width", "window width (local demand)", "float", 0.05, 0.001, 1.0, advanced=True),
@@ -352,6 +413,8 @@ MODELS: Dict[str, dict] = {
             _f("cache_latency_max", "max cache latency", "int", 500, 1, MAX_LC, advanced=True),
             _f("request_min", "min count per request", "int", 1, 1, MAX_COUNT, advanced=True),
             _f("request_max", "max count per request", "int", 10_000, 1, MAX_COUNT, advanced=True),
+            _f("count_shape", "count distribution", "choice", "uniform",
+               choices=["uniform", "heavy", "very_heavy", "high", "saturated"], advanced=True),
         ],
     ),
     "trap": dict(
@@ -421,3 +484,64 @@ def build(model: str, params: dict, seed: int = 2017) -> Tuple[str, dict]:
     if errors:
         raise ValueError("generated instance failed validation: " + "; ".join(errors[:5]))
     return text, p
+
+
+# ---------------------------------------------------------------------------
+# Presets: parameters fitted to the class benchmark (new_instances/), so the
+# console can make look-alikes. Each was checked by comparing the profile
+# (sizes, latencies, links, counts, demand structure) of a generated copy
+# with the original. The dejavu and lambda originals contain request counts
+# above the official 10000; their look-alikes stay valid, so counts that would
+# exceed it sit at 10000 instead.
+# ---------------------------------------------------------------------------
+
+PRESETS: Dict[str, dict] = {
+    "custom_dejavu42": dict(
+        model="dejavu",
+        note="Deja Vu, seed 42: 115 endpoints with their own taste, tight caches (7% of the catalog)",
+        params=dict(V=10_000, E=115, C=20, X=2_000, R=72_450, connections=4, shared_fraction=0.0,
+                    hot_set=1, noise=0.1, size_min=4, size_max=109, dc_latency_min=2,
+                    dc_latency_max=1_000, cache_latency_max=500, request_min=2_740,
+                    request_max=10_000, count_shape="saturated"),
+    ),
+    "custom_universallambda42": dict(
+        model="patterned",
+        note="Universal Lambda, seed 42: checkerboard demand, most videos 1 MB",
+        params=dict(V=10_000, E=115, C=20, X=2_000, R=717_907, size_pattern="lambda",
+                    demand_pattern="checkerboard", latency_pattern="random", density=0.637,
+                    size_min=1, size_max=1_000, dc_latency_min=1_900, dc_latency_max=2_160,
+                    cache_latency_min=1, cache_latency_max=499, request_min=1, request_max=10_000,
+                    count_shape="uniform"),
+    ),
+    "custom_universallambda42_asymmetric": dict(
+        model="patterned",
+        note="Asymmetric: same-parity demand, every endpoint on the same 63 caches, two-halves sizes",
+        params=dict(V=10_000, E=1_000, C=250, X=2_000, R=832_647, size_pattern="two_halves",
+                    demand_pattern="same_parity", latency_pattern="shared", density=0.252,
+                    size_min=1, size_max=1_000, dc_latency_min=2_000, dc_latency_max=2_000,
+                    cache_latency_min=1, cache_latency_max=99, request_min=1, request_max=33,
+                    count_shape="very_heavy"),
+    ),
+    "instance1_corrected": dict(
+        model="random",
+        note="instance1: uniform demand, 5 of 10 caches per endpoint, big caches",
+        params=dict(V=6_790, E=196, C=10, X=250_000, R=40_445, density=0.5, zipf_a=0.0,
+                    k0_fraction=0.0, video_coverage=1.0, endpoint_coverage=1.0, size_min=1,
+                    size_max=1_000, dc_latency_min=2, dc_latency_max=4_000, cache_latency_min=1,
+                    cache_latency_max=250, request_min=1, request_max=3,
+                    count_shape="very_heavy", balanced="yes"),
+    ),
+    "instance2_corrected": dict(
+        model="random",
+        note="instance2: mildly skewed demand, caches bigger than the catalog",
+        params=dict(V=4_210, E=421, C=10, X=375_000, R=61_610, density=0.5, zipf_a=0.6,
+                    k0_fraction=0.0, video_coverage=1.0, endpoint_coverage=1.0, size_min=1,
+                    size_max=1_000, dc_latency_min=2, dc_latency_max=4_000, cache_latency_min=1,
+                    cache_latency_max=136, request_min=1, request_max=7,
+                    count_shape="very_heavy", balanced="yes"),
+    ),
+}
+
+
+def describe_presets() -> Dict[str, dict]:
+    return PRESETS

@@ -22,6 +22,8 @@ export function GenerateDialog({ onClose }: { onClose: () => void }) {
   const [seed, setSeed] = useState('')
   const [advanced, setAdvanced] = useState(false)
   const [busy, setBusy] = useState(false)
+  // A preset picked for another model waits here until that model's form is set up.
+  const [pending, setPending] = useState<Record<string, number | string> | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => { api.generator().then(setSchema).catch((e) => setError(String(e))) }, [])
@@ -32,14 +34,41 @@ export function GenerateDialog({ onClose }: { onClose: () => void }) {
   }, [busy, onClose])
 
   const m = schema?.models[model]
-  // Reset the form to the model's defaults when switching model.
+  // Reset the form to the model's defaults (or a pending preset) when switching model.
   useEffect(() => {
     if (!m) return
-    setValues(Object.fromEntries(m.fields.map((f) => [f.key, String(f.default)])))
+    const base = Object.fromEntries(m.fields.map((f) => [f.key, String(f.default)]))
+    if (pending) {
+      for (const [k, v] of Object.entries(pending)) base[k] = String(v)
+      setPending(null)
+    }
+    setValues(base)
     setError(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m])
 
+  const usePreset = (name: string) => {
+    const pre = schema?.presets[name]
+    if (!pre) return
+    setSeed('42'); setName(''); setError(null)
+    if (pre.model === model && m) {
+      const base = Object.fromEntries(m.fields.map((f) => [f.key, String(f.default)]))
+      for (const [k, v] of Object.entries(pre.params)) base[k] = String(v)
+      setValues(base)
+    } else {
+      setPending(pre.params)
+      setModel(pre.model)
+    }
+  }
+
   const shown = useMemo(() => (m ? m.fields.filter((f) => advanced || !f.advanced) : []), [m, advanced])
+
+  const randomize = () => {
+    if (!m || !schema) return
+    setValues(randomValues(m.fields, schema.maxR))
+    setSeed(String(Math.floor(Math.random() * 1e9)))
+    setError(null)
+  }
 
   const submit = async () => {
     if (!m) return
@@ -92,6 +121,16 @@ export function GenerateDialog({ onClose }: { onClose: () => void }) {
 
         {schema && (
           <>
+            {Object.keys(schema.presets ?? {}).length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+                <span className="lbl">look-alike of</span>
+                {Object.entries(schema.presets).map(([name, pre]) => (
+                  <button key={name} onClick={() => usePreset(name)} title={pre.note} className="mono" style={{
+                    fontSize: 11, padding: '3px 8px', border: '1px solid var(--dc-dim)', color: 'var(--dc-bright)',
+                  }}>{name}</button>
+                ))}
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
               {Object.entries(schema.models).map(([key, mm]) => (
                 <button key={key} onClick={() => setModel(key)} style={{
@@ -106,10 +145,21 @@ export function GenerateDialog({ onClose }: { onClose: () => void }) {
                 </button>
               ))}
             </div>
-            {m && <p style={{ fontSize: 12, color: 'var(--ink-2)', margin: '12px 0 14px', lineHeight: 1.55 }}>{m.help}</p>}
+            {m && (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, margin: '12px 0 14px' }}>
+                <p style={{ flex: 1, fontSize: 12, color: 'var(--ink-2)', margin: 0, lineHeight: 1.55 }}>{m.help}</p>
+                <button onClick={randomize} title="fill every parameter (and the seed) with random valid values"
+                  style={{
+                    flex: '0 0 auto', padding: '6px 12px', fontSize: 12,
+                    border: '1px solid var(--dc)', color: 'var(--dc-bright)', background: 'var(--panel)',
+                  }}>🎲 randomize</button>
+                <button onClick={() => { setValues(Object.fromEntries(m.fields.map((f) => [f.key, String(f.default)]))); setSeed('') }}
+                  className="lbl" style={{ flex: '0 0 auto', paddingTop: 7, color: 'var(--ink-3)' }}>defaults</button>
+              </div>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
-              <Text label="name (optional)" value={name} onChange={setName} placeholder={`${model} instance`} />
+              <Text label="name (optional)" value={name} onChange={setName} placeholder="V_E_R_C (default)" />
               <Text label="seed (optional: same seed = same file)" value={seed} onChange={setSeed} placeholder="random" mono />
               {shown.map((f) => (
                 <Field key={f.key} f={f} value={values[f.key] ?? ''} onChange={(v) => setValues((s) => ({ ...s, [f.key]: v }))} />
@@ -176,4 +226,55 @@ function Text({ label, value, onChange, placeholder, mono }: {
 const input = {
   width: '100%', padding: '7px 9px', fontSize: 12.5, boxSizing: 'border-box' as const,
   background: 'var(--panel)', border: '1px solid var(--line-2)', color: 'var(--ink-0)', outline: 'none',
+}
+
+/**
+ * Random but valid values for every field of a model. Wide ranges (videos,
+ * requests, cache size...) are drawn on a log scale so small and huge are
+ * equally likely; then the cross-field rules the server enforces are applied
+ * (min <= max, requests <= videos x endpoints and the console cap, trap size).
+ */
+function randomValues(fields: GenField[], maxR: number): Record<string, string> {
+  const v: Record<string, number | string> = {}
+  for (const f of fields) {
+    if (f.type === 'choice') {
+      v[f.key] = f.choices![Math.floor(Math.random() * f.choices!.length)]
+      continue
+    }
+    const lo = f.min ?? 0
+    const hi = f.max ?? lo + 100
+    if (f.type === 'float') {
+      // Rounded to 2 decimals, then clamped: rounding must not step outside the range.
+      v[f.key] = Math.max(lo, Math.min(hi, Math.round((lo + Math.random() * (hi - lo)) * 100) / 100))
+    } else if (hi / Math.max(1, lo) > 50) {
+      const a = Math.log(Math.max(1, lo)), b = Math.log(hi)
+      v[f.key] = Math.max(lo, Math.min(hi, Math.round(Math.exp(a + Math.random() * (b - a)))))
+    } else {
+      v[f.key] = lo + Math.floor(Math.random() * (hi - lo + 1))
+    }
+  }
+  const num = (k: string) => v[k] as number
+  // Each *_min must not exceed its *_max.
+  for (const k of Object.keys(v)) {
+    if (k.endsWith('_min')) {
+      const other = k.slice(0, -4) + '_max'
+      if (other in v && num(k) > num(other)) [v[k], v[other]] = [v[other], v[k]]
+    }
+  }
+  if ('R' in v) {
+    // Distinct (video, endpoint) pairs available; the random model only draws
+    // from its requested share of videos and endpoints.
+    const videos = 'video_coverage' in v ? Math.max(1, Math.round(num('video_coverage') * num('V'))) : num('V')
+    const eps = 'endpoint_coverage' in v ? Math.max(1, Math.round(num('endpoint_coverage') * num('E'))) : num('E')
+    const pairs = 'V' in v && 'E' in v ? videos * eps : Infinity
+    v.R = Math.max(1, Math.min(num('R'), pairs, maxR))
+  }
+  // Trap: 2 x videos-per-cache x copies <= 10000 videos, cache size <= 500000.
+  if ('copies' in v && 'k' in v) {
+    v.k = Math.min(num('k'), 20)
+    v.copies = Math.max(1, Math.min(num('copies'), Math.floor(10000 / (2 * num('k')))))
+    if ('size' in v) v.size = Math.max(1, Math.min(num('size'), Math.floor(500000 / num('k'))))
+    if ('margin' in v && 'count' in v) v.margin = Math.min(num('margin'), 10000 - num('count'))
+  }
+  return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, String(x)]))
 }

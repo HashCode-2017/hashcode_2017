@@ -13,7 +13,8 @@ export interface GenField {
   min: number | null; max: number | null; help: string; choices: string[] | null; advanced: boolean
 }
 export interface GenModel { label: string; help: string; fields: GenField[] }
-export interface GeneratorSchema { models: Record<string, GenModel>; maxR: number; perGroup: number }
+export interface GenPreset { model: string; note: string; params: Record<string, number | string> }
+export interface GeneratorSchema { models: Record<string, GenModel>; presets: Record<string, GenPreset>; maxR: number; perGroup: number }
 
 export interface Hist { lo: number; hi: number; bins: number[]; max: number }
 

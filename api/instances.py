@@ -99,6 +99,12 @@ def _web_file(instance_id):
     return path
 
 
+def drop_parsed():
+    """Free every parsed instance (they are re-read from disk on demand)."""
+    with _cache_lock:
+        _cache.clear()
+
+
 def forget(instance_id):
     """Drop a deleted generated instance from every cache."""
     with _cache_lock:
