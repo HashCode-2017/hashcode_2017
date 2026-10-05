@@ -73,7 +73,8 @@ export function RankReveal({ runId, onClose }: { runId: string; onClose: () => v
     return { rows, before, after, size: board.after.length, trimmed: keep.size < board.after.length }
   }, [board, meKey, phase])
 
-  const moved = view?.before && view.after ? view.before.rank - view.after.rank : null
+  // The reveal's boards never contain unranked rows, so both ranks are set.
+  const moved = view?.before?.rank != null && view.after?.rank != null ? view.before.rank - view.after.rank : null
   // The latest upload replaces the previous one, so a group can also go down.
   const verdict = !report ? '' : !report.valid ? 'invalid — this data set now counts 0'
     : !view?.after ? '' : !view.before ? 'new on the board'

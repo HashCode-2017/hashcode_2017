@@ -121,8 +121,17 @@ export interface MySubmission {
   username?: string
 }
 export interface BoardRow {
-  key: string; name: string; group: string; rank: number
+  key: string; name: string; group: string; rank: number | null
   total: number; scores: Record<string, number>
+  /** registered group with nothing on these data sets yet: listed last, unranked */
+  empty?: boolean
+}
+export interface GroupMatrix {
+  instances: string[]; evaluation: string[]; best: Record<string, number>
+  groups: {
+    group: string; members: number; submissions: number; last: number | null
+    scores: Record<string, { score: number; valid: boolean }>
+  }[]
 }
 export interface Board { scope: string; by: 'user' | 'group'; instances: string[]; rows: BoardRow[] }
 export interface RankBoard { scope: string; by: 'user' | 'group'; before: BoardRow[]; after: BoardRow[] }
@@ -207,6 +216,7 @@ export const api = {
     post<RunMeta>('/api/submissions', { instance, out, trace }),
   mySubmissions: () => get<MySubmission[]>('/api/submissions/mine'),
   stats: () => get<ClassStats>('/api/stats'),
+  matrix: () => get<GroupMatrix>('/api/leaderboard/matrix'),
   generator: () => get<GeneratorSchema>('/api/generator'),
   generate: (model: string, params: Record<string, unknown>, seed: number | null, name: string) =>
     post<InstanceRow>('/api/instances/generate', { model, params, seed, name }),

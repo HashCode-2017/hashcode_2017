@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { LayoutGroup } from 'framer-motion'
-import { api, type Board } from '../lib/api'
+import { api, type Board, type GroupMatrix } from '../lib/api'
 import { useApp } from '../lib/store'
 import { BoardRows } from '../components/BoardRows'
 import { bytes, int } from '../lib/format'
@@ -79,6 +79,8 @@ export function Leaderboard() {
         </div>
 
         <Section title={final ? 'Final ranking — groups' : `${scope} — groups`} scope={scope} />
+
+        <AllDataSets current={scope} onPick={setScope} />
       </div>
     </div>
   )
@@ -137,5 +139,96 @@ export function Tabs({ value, onChange, options }: {
         }}>{label}</button>
       ))}
     </div>
+  )
+}
+
+/** "3 min ago" from a unix time in seconds. */
+function ago(t: number | null) {
+  if (!t) return 'never'
+  const m = Math.max(0, Math.round((Date.now() / 1000 - t) / 60))
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m} min ago`
+  const h = Math.round(m / 60)
+  return h < 48 ? `${h} h ago` : `${Math.round(h / 24)} d ago`
+}
+
+/**
+ * Every group x every data set that has submissions: each group's latest
+ * score (the one its boards use), the best per data set highlighted, plus how
+ * active each group is. The final ranking only counts the evaluation sets;
+ * this is where all the other work shows up. Click a column for its board.
+ */
+function AllDataSets({ current, onPick }: { current: string; onPick: (scope: string) => void }) {
+  const user = useApp((s) => s.user)
+  const [m, setM] = useState<GroupMatrix | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    const load = () => api.matrix().then((x) => { if (alive) setM(x) }).catch(() => null)
+    void load()
+    const t = setInterval(load, POLL_MS)
+    return () => { alive = false; clearInterval(t) }
+  }, [])
+
+  if (!m || m.groups.length === 0) return null
+  const cols = `90px repeat(${m.instances.length}, minmax(96px, 1fr)) 92px 92px`
+
+  return (
+    <section style={{ marginTop: 30 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink-0)', margin: 0 }}>All data sets — every group</h2>
+        <span className="lbl">latest score per data set · <span style={{ color: 'var(--ca-bright)' }}>■</span> best ·{' '}
+          <span style={{ color: 'var(--dc-bright)' }}>★</span> counts for the final ranking · click a column for its board</span>
+      </div>
+      <div style={{ overflowX: 'auto', border: '1px solid var(--line)', background: 'var(--panel)' }}>
+        <div style={{ minWidth: 90 + 96 * m.instances.length + 184 }}>
+          <div className="lbl" style={{
+            display: 'grid', gridTemplateColumns: cols, gap: 8, padding: '8px 12px',
+            borderBottom: '1px solid var(--line)', alignItems: 'end',
+          }}>
+            <span>group</span>
+            {m.instances.map((i) => {
+              const evalSet = m.evaluation.includes(i)
+              return (
+                <button key={i} onClick={() => onPick(i)} title={`open the ${i} board`} className="lbl" style={{
+                  textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  color: current === i ? 'var(--ca-bright)' : evalSet ? 'var(--dc-bright)' : 'var(--ink-3)',
+                }}>{evalSet ? '★ ' : ''}{i}</button>
+              )
+            })}
+            <span style={{ textAlign: 'right' }}>uploads</span>
+            <span style={{ textAlign: 'right' }}>last upload</span>
+          </div>
+          {m.groups.map((g) => {
+            const mine = user?.group === g.group
+            return (
+              <div key={g.group} className="mono" style={{
+                display: 'grid', gridTemplateColumns: cols, gap: 8, padding: '7px 12px', fontSize: 12,
+                borderBottom: '1px solid var(--line)', alignItems: 'center',
+                background: mine ? 'var(--panel-3)' : 'transparent',
+              }}>
+                <span style={{ color: mine ? 'var(--ca-bright)' : 'var(--ink-1)', fontFamily: 'var(--sans)', fontWeight: mine ? 600 : 400 }}>
+                  Group {g.group}<span className="lbl" style={{ marginLeft: 6 }}>{g.members}/4</span>
+                </span>
+                {m.instances.map((i) => {
+                  const cell = g.scores[i]
+                  if (!cell) return <span key={i} style={{ textAlign: 'right', color: 'var(--ink-4)' }}>—</span>
+                  const top = cell.valid && cell.score === m.best[i] && cell.score > 0
+                  return (
+                    <span key={i} title={cell.valid ? undefined : 'latest upload overflows a cache: counts 0'} style={{
+                      textAlign: 'right',
+                      color: !cell.valid ? 'var(--alert-bright)' : top ? 'var(--ca-bright)' : 'var(--ink-1)',
+                      fontWeight: top ? 600 : 400,
+                    }}>{cell.valid ? int(cell.score) : 'invalid'}</span>
+                  )
+                })}
+                <span style={{ textAlign: 'right', color: g.submissions ? 'var(--ink-1)' : 'var(--ink-4)' }}>{g.submissions}</span>
+                <span style={{ textAlign: 'right', color: 'var(--ink-3)', fontSize: 11 }}>{ago(g.last)}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </section>
   )
 }

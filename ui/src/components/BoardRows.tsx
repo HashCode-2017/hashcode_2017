@@ -36,7 +36,7 @@ export function BoardRows({ rows, highlight, columns, ghost }: {
             key={r.key}
             layout
             initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: r.ghostRow ? 0.35 : 1, y: 0 }}
+            animate={{ opacity: r.ghostRow ? 0.35 : r.empty ? 0.45 : 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ layout: { type: 'spring', stiffness: 120, damping: 20 }, duration: 0.35 }}
             style={{
@@ -50,7 +50,7 @@ export function BoardRows({ rows, highlight, columns, ghost }: {
           >
             <span className="num" style={{
               fontSize: 15, color: r.rank === 1 && !r.ghostRow ? 'var(--dc-bright)' : me ? 'var(--ca-bright)' : 'var(--ink-2)',
-            }}>{r.ghostRow ? '—' : `#${r.rank}`}</span>
+            }}>{r.ghostRow || r.empty ? '—' : `#${r.rank}`}</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
               <span className="mono" style={{
                 fontSize: 10.5, color: 'var(--ink-2)', border: '1px solid var(--line-2)',
@@ -67,7 +67,9 @@ export function BoardRows({ rows, highlight, columns, ghost }: {
               </span>
             ))}
             <span className="num" style={{ textAlign: 'right', fontSize: 14.5, color: me ? 'var(--ca-bright)' : 'var(--ink-0)' }}>
-              <Num value={r.total} />
+              {r.empty
+                ? <span className="lbl" style={{ color: 'var(--ink-3)' }}>no evaluation submission yet</span>
+                : <Num value={r.total} />}
             </span>
           </motion.div>
         )

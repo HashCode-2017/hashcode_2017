@@ -425,9 +425,9 @@ def api_my_submissions(user=Depends(current_user)):
     return db.group_submissions(user)
 
 
-def _board(scope, by, upto=None):
+def _board(scope, by, upto=None, include_empty=False):
     instances = ranked() if scope == "overall" else [scope]
-    return db.leaderboard(instances, by=by, upto=upto)
+    return db.leaderboard(instances, by=by, upto=upto, include_empty=include_empty)
 
 
 @app.get("/api/leaderboard")
@@ -437,7 +437,16 @@ def api_leaderboard(scope: str = "overall", by: str = "user"):
     if scope != "overall" and inst_mod.path_for(scope) is None:
         raise HTTPException(404, f"unknown instance: {scope}")
     return {"scope": scope, "by": by, "instances": ranked() if scope == "overall" else [scope],
-            "rows": _board(scope, by)}
+            "rows": _board(scope, by, include_empty=True)}
+
+
+@app.get("/api/leaderboard/matrix")
+def api_leaderboard_matrix(user=Depends(current_user)):
+    """Every group's latest score on every listed data set, with activity."""
+    listed = [r["id"] for r in inst_mod.list_instances()]
+    out = db.group_matrix(listed)
+    out["evaluation"] = ranked()
+    return out
 
 
 @app.get("/api/stats")

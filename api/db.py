@@ -853,7 +853,7 @@ def class_stats():
     }
 
 
-def leaderboard(instances, by="user", upto=None):
+def leaderboard(instances, by="user", upto=None, include_empty=False):
     """Ranked rows: the LATEST submission per (group or player, instance),
     summed over `instances`.
 
@@ -899,4 +899,46 @@ def leaderboard(instances, by="user", upto=None):
     for i, r in enumerate(out):
         r["rank"] = i + 1
         del r["last"]
+    if include_empty and by == "group":
+        # Every registered group appears, so nobody is invisible: those with
+        # nothing on these data sets yet come last, unranked.
+        present = {r["group"] for r in out}
+        for g in GROUPS:
+            if g not in present and any(u["grp"] == g for u in users.values()):
+                out.append({"key": f"g{g}", "name": f"Group {g}", "group": g, "total": 0,
+                            "scores": {}, "rank": None, "empty": True})
     return out
+
+
+def group_matrix(listed):
+    """Every competing group x every listed data set with a submission:
+    the group's latest score there (as on the boards), plus activity."""
+    users = {u["id"]: u for u in store().users()}
+    latest, activity = {}, {}
+    for s in store().all_submissions():
+        u = users.get(s["user_id"])
+        if u is None or u["grp"] in (None, PROFESSORS):
+            continue
+        g = u["grp"]
+        a = activity.setdefault(g, {"submissions": 0, "last": 0})
+        a["submissions"] += 1
+        a["last"] = max(a["last"], s["created"])
+        if s["instance"] not in listed:
+            continue
+        cur = latest.get((g, s["instance"]))
+        if cur is None or s["id"] > cur["id"]:
+            latest[(g, s["instance"])] = {"id": s["id"], "score": s["score"] if s["valid"] else 0,
+                                         "valid": bool(s["valid"])}
+    members = {}
+    for u in users.values():
+        if u["grp"] in GROUPS:
+            members[u["grp"]] = members.get(u["grp"], 0) + 1
+    instances = [i for i in listed if any(k[1] == i for k in latest)]
+    best = {i: max(v["score"] for k, v in latest.items() if k[1] == i) for i in instances}
+    groups = [{"group": g, "members": members[g],
+               "submissions": activity.get(g, {}).get("submissions", 0),
+               "last": activity.get(g, {}).get("last") or None,
+               "scores": {i: {"score": latest[(g, i)]["score"], "valid": latest[(g, i)]["valid"]}
+                          for i in instances if (g, i) in latest}}
+              for g in GROUPS if g in members]
+    return {"instances": instances, "best": best, "groups": groups}
