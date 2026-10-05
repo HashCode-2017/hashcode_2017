@@ -31,16 +31,12 @@ CATALOG = [
 OFFICIAL = ["me_at_the_zoo", "videos_worth_spreading", "trending_today", "kittens"]
 
 
-# The class's shared benchmark (new_instances/), from LesageArno/instanceCreatorHashcode2016.
+# The class's shared benchmark: the large instances of LesageArno/instanceCreatorHashcode2016
+# (new_instances/; the small hand-made ones there are not listed).
 # Our own 12 presets stay in generated_instances/ and can be rebuilt with
 # generate.py, but are no longer listed; groups generate more from the console.
 SRC = "LesageArno/instanceCreator"
 CATALOG += [
-    ("unit_size", "new_instances/unit_size.in", f"Hand-made greedy trap: unit-size videos ({SRC})"),
-    ("any_size_le_X", "new_instances/any_size_le_X.in", f"Hand-made: any size up to the cache ({SRC})"),
-    ("le_X_over_2", "new_instances/le_X_over_2.in", f"Hand-made greedy trap: sizes up to X/2 ({SRC})"),
-    ("le_X_over_4", "new_instances/le_X_over_4.in", f"Hand-made greedy trap: sizes up to X/4 ({SRC})"),
-    ("le_X_over_10", "new_instances/le_X_over_10.in", f"Hand-made greedy trap: sizes up to X/10 ({SRC})"),
     ("instance1_corrected", "new_instances/instance1_corrected.in", f"instance1, duplicate requests merged ({SRC})"),
     ("instance2_corrected", "new_instances/instance2_corrected.in", f"instance2, duplicate requests merged ({SRC})"),
     ("custom_dejavu42", "new_instances/custom_dejavu42.in", f"Deja Vu, seed 42, as generated: some counts > 10000 ({SRC})"),
