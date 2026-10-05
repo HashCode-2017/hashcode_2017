@@ -98,7 +98,7 @@ export function Select() {
                 <div style={{ marginTop: 9, display: 'flex', gap: 6, alignItems: 'center' }}>
                   {r.official && <Chip tone="dc">ranked</Chip>}
                   {r.generated && (
-                    <Chip tone="ca">{r.generated.model} · {r.generated.group === 'P' ? 'professors' : r.generated.group ? `group ${r.generated.group}` : 'admin'}</Chip>
+                    <Chip tone="ca">{r.generated.model} · by {r.generated.by} ({r.generated.group === 'P' ? 'professors' : r.generated.group ? `group ${r.generated.group}` : 'admin'})</Chip>
                   )}
                   {admin && (
                     <Chip tone={r.prewarmed ? 'ca' : 'idle'}>
