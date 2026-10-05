@@ -348,7 +348,9 @@ function StatusStrip({ instanceId, meta, hasResult }: {
   meta: { status: string; cached: boolean; solveSeconds: number | null; source: string; owner: string | null } | null
   hasResult: boolean
 }) {
-  if (!instanceId) return null
+  // Only for the reference solver: for a submission the top bar already says
+  // whose run it is, and this fixed line sat on top of the charts' legends.
+  if (!instanceId || !meta || meta.source !== 'solver') return null
   const label = !meta ? 'idle'
     : meta.status === 'done'
       ? (meta.source !== 'solver' ? `submission by ${meta.owner}`
