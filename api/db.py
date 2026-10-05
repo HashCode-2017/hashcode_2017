@@ -74,6 +74,10 @@ class SqliteStore:
                 run_id TEXT UNIQUE NOT NULL, score INTEGER NOT NULL, valid INTEGER NOT NULL,
                 source TEXT NOT NULL, created REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS hc_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS hc_instances (
+                id TEXT PRIMARY KEY, label TEXT NOT NULL, model TEXT NOT NULL, params TEXT NOT NULL,
+                seed INTEGER NOT NULL, owner_group TEXT, created_by TEXT NOT NULL, header TEXT NOT NULL,
+                bytes INTEGER NOT NULL, data TEXT NOT NULL, created REAL NOT NULL);
         """)
         for ddl in ("ALTER TABLE hc_users ADD COLUMN email TEXT",
                     "ALTER TABLE hc_sessions ADD COLUMN sb_refresh TEXT"):
@@ -128,6 +132,30 @@ class SqliteStore:
     def user_by_email(self, email):
         rows = self._all("SELECT * FROM hc_users WHERE lower(email) = lower(?)", (email,))
         return rows[0] if rows else None
+
+    GEN_COLS = "id, label, model, params, seed, owner_group, created_by, header, bytes, created"
+
+    def save_instance(self, row):
+        import json
+        self._write("INSERT INTO hc_instances (id, label, model, params, seed, owner_group, created_by,"
+                    " header, bytes, data, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (row["id"], row["label"], row["model"], json.dumps(row["params"]), row["seed"],
+                     row["owner_group"], row["created_by"], row["header"], row["bytes"], row["data"],
+                     time.time()))
+
+    def generated_instances(self):
+        import json
+        rows = self._all(f"SELECT {self.GEN_COLS} FROM hc_instances ORDER BY created")
+        for r in rows:
+            r["params"] = json.loads(r["params"])
+        return rows
+
+    def generated_data(self, instance_id):
+        rows = self._all("SELECT data FROM hc_instances WHERE id = ?", (instance_id,))
+        return rows[0]["data"] if rows else None
+
+    def delete_instance(self, instance_id):
+        self._write("DELETE FROM hc_instances WHERE id = ?", (instance_id,))
 
     def insert_user(self, username, group, salt, pw_hash, auth_id=None, email=None):
         with self.lock:
@@ -294,6 +322,25 @@ class SupabaseStore:
     def user_by_email(self, email):
         rows = self._get("hc_users", select="*", email=f"ilike.{email.replace('_', chr(92) + '_')}")
         return rows[0] if rows else None
+
+    def save_instance(self, row):
+        r = self.http.post("/hc_instances", json=row)
+        if r.status_code >= 400:
+            raise RuntimeError(f"supabase: {r.text[:200]}")
+
+    def generated_instances(self):
+        rows = self._get("hc_instances", order="created.asc",
+                         select="id,label,model,params,seed,owner_group,created_by,header,bytes,created")
+        for r in rows:
+            r["created"] = _epoch(r["created"])
+        return rows
+
+    def generated_data(self, instance_id):
+        rows = self._get("hc_instances", select="data", id=f"eq.{instance_id}")
+        return rows[0]["data"] if rows else None
+
+    def delete_instance(self, instance_id):
+        self.http.delete("/hc_instances", params={"id": f"eq.{instance_id}"})
 
     def user_by_auth(self, auth_id):
         rows = self._get("hc_users", select="*", auth_id=f"eq.{auth_id}")
@@ -655,6 +702,43 @@ def submission_by_run(run_id):
 
 def submissions_for(user_id):
     return store().submissions_for(user_id)
+
+
+# -------------------------------------------------------- generated instances
+#
+# Instances made from the web console. Like replays, the text lives in the
+# database (gzipped) so it outlives the server's disk; api/instances.py keeps a
+# file copy as a cache because the parser and the download read files.
+
+def _pack(text):
+    import base64, gzip
+    return base64.b64encode(gzip.compress(text.encode("ascii"))).decode("ascii")
+
+
+def _unpack(packed):
+    import base64, gzip
+    return gzip.decompress(base64.b64decode(packed)).decode("ascii")
+
+
+def save_generated(row, text):
+    store().save_instance(dict(row, data=_pack(text), bytes=len(text)))
+
+
+def generated_instances():
+    try:
+        return store().generated_instances()
+    except Exception as exc:                     # e.g. the table is not created yet
+        print(f"warning: cannot list generated instances: {exc}")
+        return []
+
+
+def generated_text(instance_id):
+    packed = store().generated_data(instance_id)
+    return _unpack(packed) if packed else None
+
+
+def delete_generated(instance_id):
+    store().delete_instance(instance_id)
 
 
 # ------------------------------------------------------------------ replays

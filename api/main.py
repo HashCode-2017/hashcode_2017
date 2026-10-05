@@ -296,6 +296,80 @@ def api_set_group(user_id: int, body: GroupChange, admin=Depends(admin_user)):
         raise HTTPException(400, str(exc))
 
 
+# ------------------------------------------------------ instance generator
+
+import re as _re
+import secrets as _secrets
+import sys as _sys
+
+_sys.path.insert(0, os.path.join(ROOT, "generated_instances"))
+import models as gen_models  # noqa: E402  -- generated_instances/models.py
+
+WEB_MAX_R = 200_000            # keeps generation and solving responsive on one dyno
+WEB_MAX_PER_GROUP = 10
+
+
+class GenerateRequest(BaseModel):
+    model: str
+    params: dict = {}
+    seed: int | None = None
+    name: str | None = None
+
+
+@app.get("/api/generator")
+def api_generator(user=Depends(current_user)):
+    return {"models": gen_models.describe(), "maxR": WEB_MAX_R, "perGroup": WEB_MAX_PER_GROUP}
+
+
+@app.post("/api/instances/generate")
+def api_generate(body: GenerateRequest, user=Depends(current_user)):
+    group = user.get("group")
+    if not user.get("isAdmin"):
+        mine = [m for m in inst_mod.web_instances(refresh=True).values() if m["owner_group"] == group]
+        if len(mine) >= WEB_MAX_PER_GROUP:
+            raise HTTPException(400, f"your group already has {WEB_MAX_PER_GROUP} generated instances: "
+                                     "delete one first")
+    try:
+        params = gen_models.resolve(body.model, body.params)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    lines = params.get("R") or 2 * params.get("k", 0) * params.get("copies", 0)
+    if lines > WEB_MAX_R:
+        raise HTTPException(400, f"at most {WEB_MAX_R:,} request lines from the console "
+                                 "(use generate.py locally for bigger ones)")
+    seed = body.seed if body.seed is not None else _secrets.randbelow(10**9)
+    try:
+        text, params = gen_models.build(body.model, body.params, seed=seed)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+    label = (body.name or "").strip()[:40] or f"{body.model} {seed}"
+    slug = _re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")[:32] or body.model
+    instance_id = f"gen_{slug}_{_secrets.token_hex(2)}"
+    db.save_generated({
+        "id": instance_id, "label": label, "model": body.model, "params": params, "seed": seed,
+        "owner_group": group, "created_by": user["username"], "header": text.split("\n", 1)[0],
+    }, text)
+    inst_mod.web_instances(refresh=True)
+    row = next((r for r in inst_mod.list_instances() if r["id"] == instance_id), None)
+    if row is None:
+        raise HTTPException(500, "instance saved but not listed")
+    row["prewarmed"] = False
+    return row
+
+
+@app.delete("/api/instances/{instance_id}")
+def api_delete_instance(instance_id: str, user=Depends(current_user)):
+    meta = inst_mod.web_instances(refresh=True).get(instance_id)
+    if meta is None:
+        raise HTTPException(404, "only generated instances can be deleted")
+    if not user.get("isAdmin") and meta["owner_group"] != user.get("group"):
+        raise HTTPException(403, "only the group that generated it (or an admin) can delete it")
+    db.delete_generated(instance_id)
+    inst_mod.forget(instance_id)
+    return {"ok": True}
+
+
 @app.get("/api/ranked")
 def api_ranked(user=Depends(current_user)):
     return {"instances": ranked(), "default": inst_mod.OFFICIAL}

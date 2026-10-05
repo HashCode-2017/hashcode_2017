@@ -42,6 +42,11 @@ Usage:
     # N instances with random parameters; any parameter given stays fixed
     python generate.py --random 5 --scale medium --density 1.0
 
+    # the other models (see models.py): dejavu, patterned, trap
+    python generate.py --list-models
+    python generate.py --model trap --set copies=200 --set k=4 --name big_trap
+    python generate.py --model patterned --set demand_pattern=checkerboard
+
 Run with --help for every parameter.
 """
 
@@ -53,6 +58,9 @@ import random
 import sys
 from dataclasses import dataclass, field
 from typing import List, Optional
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import models  # noqa: E402  -- the dejavu / patterned / trap models
 
 
 # ---------------------------------------------------------------------------
@@ -605,6 +613,13 @@ def main():
     mode.add_argument("--scale", default="any",
                       choices=["any"] + sorted(RANDOM_TIERS),
                       help="size tier for --random")
+    mode.add_argument("--model", choices=sorted(models.MODELS),
+                      help="use another model instead of the random one; "
+                           "set its parameters with --set (see --list-models)")
+    mode.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                      help="a parameter of --model (repeatable)")
+    mode.add_argument("--list-models", action="store_true",
+                      help="list the other models and their parameters, then exit")
     mode.add_argument("--name",
                       help="file name for a custom instance (default: custom), "
                            "or name prefix for --random (default: random)")
@@ -615,6 +630,40 @@ def main():
                             help=help_text)
 
     args = parser.parse_args()
+
+    if args.list_models:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(errors="replace")
+        for name, m in models.MODELS.items():
+            print(f"\n{name}: {m['label']}\n  {m['help']}")
+            for f in m["fields"]:
+                rng_ = f" one of {f['choices']}" if f["choices"] else f" [{f['min']}, {f['max']}]"
+                print(f"    {f['key']:<20s} default {f['default']!s:<10s}{rng_}  {f['label']}")
+        return
+
+    if args.model:
+        params = {}
+        for item in args.set:
+            if "=" not in item:
+                parser.error(f"--set needs KEY=VALUE, got {item!r}")
+            key, value = item.split("=", 1)
+            params[key.strip()] = value.strip()
+        known = {f["key"] for f in models.MODELS[args.model]["fields"]}
+        unknown = set(params) - known
+        if unknown:
+            parser.error(f"unknown parameter(s) for {args.model}: {', '.join(sorted(unknown))} "
+                         f"(see --list-models)")
+        try:
+            text, _ = models.build(args.model, params, seed=args.seed)
+        except ValueError as exc:
+            parser.error(str(exc))
+        os.makedirs(args.out_dir, exist_ok=True)
+        spec = InstanceSpec(name=args.name or args.model, tag=f"model: {args.model}",
+                            V=1, E=1, C=1, R=1, X=1, zipf_a=0.0, density=0.0)
+        row = emit(spec, text, args.out_dir)
+        write_manifest(args.out_dir, [row])
+        print(f"\n  Wrote {spec.name}.in + manifest.csv to {os.path.abspath(args.out_dir)}/")
+        return
 
     if args.list_presets:
         # Tags contain non-ASCII (e.g. "≈"), which the Windows console rejects.

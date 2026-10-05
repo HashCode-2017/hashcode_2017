@@ -12,3 +12,4 @@ ui/tsconfig.tsbuildinfo
 .data/
 .env
 !requirements.txt
+.generated/

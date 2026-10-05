@@ -169,3 +169,22 @@ The generator uses a single `random.Random` instance seeded with `--seed 2017`
 - **`manifest.csv`** — machine-readable summary of every instance's parameters.
 - **`*.in`** — the 12 generated instances, directly consumable by `solution.py`.
 - **`README.md`** — this file.
+
+## More models: `dejavu`, `patterned`, `trap`
+
+`models.py` adds three models next to the random one above, each checked
+against every official limit on the produced file before it is written:
+
+| Model | What it builds |
+|---|---|
+| `dejavu` | Endpoint locality at full scale: each endpoint has its own favourite videos plus a shared hot set. Inspired by the "Deja Vu" generator of LesageArno/instanceCreatorHashcode2016, but repeated (video, endpoint) pairs are merged and counts stay <= 10000. |
+| `patterned` | Named patterns instead of arbitrary code: decreasing or two-size videos, checkerboard or local demand, latency that grows with distance. |
+| `trap` | Copies of a gadget where the best-looking first placement locks another endpoint out. A density greedy (ours included) scores about half the optimum. |
+
+```bash
+python3 generated_instances/generate.py --list-models
+python3 generated_instances/generate.py --model trap --set copies=200 --set k=4 --name big_trap
+python3 generated_instances/generate.py --model patterned --set demand_pattern=checkerboard
+```
+
+The same models (and `random`) are available in the web console: **Ingest → + generate a new instance**.

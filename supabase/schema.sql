@@ -103,3 +103,20 @@ create table if not exists hc_runs (
     created     timestamptz not null default now()
 );
 alter table hc_runs enable row level security;
+
+-- Instances generated from the web console (Ingest -> generate). The text is
+-- gzipped + base64; the server keeps a disk copy as a cache.
+create table if not exists hc_instances (
+    id          text primary key,
+    label       text not null,
+    model       text not null,
+    params      jsonb not null,
+    seed        bigint not null,
+    owner_group text,
+    created_by  text not null,
+    header      text not null,
+    bytes       bigint not null,
+    data        text not null,
+    created     timestamptz not null default now()
+);
+alter table hc_instances enable row level security;

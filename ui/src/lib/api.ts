@@ -4,7 +4,16 @@ export interface InstanceRow {
   id: string; file: string; blurb: string; bytes: number; tier: Tier
   V: number; E: number; R: number; C: number; X: number
   prewarmed: boolean; loaded: boolean; official: boolean
+  /** set for instances generated from the console */
+  generated?: { model: string; group: string | null; by: string; params: Record<string, unknown>; seed: number }
 }
+
+export interface GenField {
+  key: string; label: string; type: 'int' | 'float' | 'choice'; default: number | string
+  min: number | null; max: number | null; help: string; choices: string[] | null; advanced: boolean
+}
+export interface GenModel { label: string; help: string; fields: GenField[] }
+export interface GeneratorSchema { models: Record<string, GenModel>; maxR: number; perGroup: number }
 
 export interface Hist { lo: number; hi: number; bins: number[]; max: number }
 
@@ -197,6 +206,10 @@ export const api = {
     post<RunMeta>('/api/submissions', { instance, out, trace }),
   mySubmissions: () => get<MySubmission[]>('/api/submissions/mine'),
   stats: () => get<ClassStats>('/api/stats'),
+  generator: () => get<GeneratorSchema>('/api/generator'),
+  generate: (model: string, params: Record<string, unknown>, seed: number | null, name: string) =>
+    post<InstanceRow>('/api/instances/generate', { model, params, seed, name }),
+  deleteInstance: (id: string) => send<{ ok: boolean }>('DELETE', `/api/instances/${id}`, {}),
   routed: (runId: string) => get<RoutedMatrix>(`/api/runs/${runId}/routed`),
   ranked: () => get<{ instances: string[]; default: string[] }>('/api/ranked'),
   people: () => get<Person[]>('/api/admin/people'),

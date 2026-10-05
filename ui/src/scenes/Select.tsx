@@ -16,6 +16,12 @@ export function Select() {
   const select = useApp((s) => s.select)
   const submitFor = useApp((s) => s.submitFor)
   const admin = useApp((s) => !!s.user?.isAdmin)
+  const user = useApp((s) => s.user)
+  const setGeneratorOpen = useApp((s) => s.setGeneratorOpen)
+  const loadInstances = useApp((s) => s.loadInstances)
+  const remove = async (r: InstanceRow) => {
+    try { await api.deleteInstance(r.id); await loadInstances() } catch { /* the card simply stays */ }
+  }
   // Remembered across visits: a group working on the evaluation sets wants to stay there.
   const [only, setOnly] = useState(() => localStorage.getItem('dataset-filter') === 'evaluation')
   const choose = (v: string) => {
@@ -55,6 +61,8 @@ export function Select() {
           {only && (
             <span className="lbl">the data sets the admin chose for the final ranking</span>
           )}
+          <span style={{ flex: 1 }} />
+          <button onClick={() => setGeneratorOpen(true)} className="lbl act-btn act-btn-main">+ generate a new instance</button>
         </div>
 
         {only && evaluation.length === 0 && (
@@ -89,6 +97,9 @@ export function Select() {
                 <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 3 }}>{r.blurb}</div>
                 <div style={{ marginTop: 9, display: 'flex', gap: 6, alignItems: 'center' }}>
                   {r.official && <Chip tone="dc">ranked</Chip>}
+                  {r.generated && (
+                    <Chip tone="ca">{r.generated.model} · {r.generated.group === 'P' ? 'professors' : r.generated.group ? `group ${r.generated.group}` : 'admin'}</Chip>
+                  )}
                   {admin && (
                     <Chip tone={r.prewarmed ? 'ca' : 'idle'}>
                       {r.prewarmed ? 'prewarmed' : 'solves live'}
@@ -107,6 +118,12 @@ export function Select() {
                     onClick={(e) => { e.stopPropagation(); void submitFor(r.id) }}
                     className="lbl act-btn act-btn-main"
                   >submit solution →</button>
+                  {r.generated && (admin || (user?.group && r.generated.group === user.group)) && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); void remove(r) }}
+                      className="lbl act-btn" title="delete this generated instance"
+                    >delete</button>
+                  )}
                 </div>
               </div>
 

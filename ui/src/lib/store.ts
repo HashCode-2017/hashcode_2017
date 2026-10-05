@@ -25,6 +25,8 @@ interface App {
   reveal: string | null
   /** The run whose rank reveal is on screen. */
   showRank: string | null
+  /** The instance generator dialog is open. */
+  generatorOpen: boolean
   /** A player opened the placement acts without having submitted anything here. */
   needSubmission: boolean
 
@@ -51,6 +53,7 @@ interface App {
   submitFor: (instance: string) => Promise<void>
   setReveal: (runId: string | null) => void
   setShowRank: (runId: string | null) => void
+  setGeneratorOpen: (open: boolean) => void
 
   loadInstances: () => Promise<void>
   select: (id: string, runId?: string | null) => Promise<void>
@@ -73,6 +76,7 @@ export const useApp = create<App>((set, get) => ({
   runId: null,
   reveal: null,
   showRank: null,
+  generatorOpen: false,
   needSubmission: false,
   act: 0,
   explore: false,
@@ -119,6 +123,7 @@ export const useApp = create<App>((set, get) => ({
 
   setReveal: (reveal) => set({ reveal }),
   setShowRank: (showRank) => set({ showRank }),
+  setGeneratorOpen: (generatorOpen) => set({ generatorOpen }),
 
   loadInstances: async () => {
     try { set({ instances: await api.instances() }) }

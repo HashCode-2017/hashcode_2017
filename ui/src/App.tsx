@@ -15,6 +15,7 @@ import { Leaderboard } from './scenes/Leaderboard'
 import { Stats } from './scenes/Stats'
 import { Admin } from './scenes/Admin'
 import { RankReveal } from './components/RankReveal'
+import { GenerateDialog } from './components/GenerateDialog'
 
 const SCENES = [Select, Ingest, Topology, Solve, Routing, Submission]
 
@@ -32,6 +33,8 @@ export default function App() {
   const page = useApp((s) => s.page)
   const showRank = useApp((s) => s.showRank)
   const setShowRank = useApp((s) => s.setShowRank)
+  const generatorOpen = useApp((s) => s.generatorOpen)
+  const setGeneratorOpen = useApp((s) => s.setGeneratorOpen)
 
   useEffect(() => { void checkAuth() }, [checkAuth])
   useEffect(() => { if (user) void loadInstances() }, [user, loadInstances])
@@ -42,7 +45,7 @@ export default function App() {
       const el = document.activeElement
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return
       const s = useApp.getState()
-      if (!s.user || s.showRank) return
+      if (!s.user || s.showRank || s.generatorOpen) return
       // On a page only E (free explore) applies; the act keys belong to the story.
       if (s.page) { if (e.key === 'e' || e.key === 'E') s.toggleExplore(); return }
       if (e.key === 'ArrowRight') { s.go(1); e.preventDefault() }
@@ -108,6 +111,7 @@ export default function App() {
       <StatusStrip instanceId={instanceId} meta={meta} hasResult={!!result} />
       <AnimatePresence>
         {showRank && <RankReveal key={showRank} runId={showRank} onClose={() => setShowRank(null)} />}
+        {generatorOpen && <GenerateDialog key="gen" onClose={() => setGeneratorOpen(false)} />}
       </AnimatePresence>
     </div>
   )
