@@ -107,10 +107,14 @@ function Section({ title, scope }: { title: string; scope: string }) {
     <section>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
         <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink-0)', margin: 0 }}>{title}</h2>
-        {board && <span className="lbl">{board.rows.length} group{board.rows.length === 1 ? '' : 's'} ranked</span>}
+        {board && (() => {
+          const ranked = board.rows.filter((r) => !r.empty).length
+          const waiting = board.rows.length - ranked
+          return <span className="lbl">{ranked} group{ranked === 1 ? '' : 's'} ranked{waiting ? ` · ${waiting} not submitted here yet` : ''}</span>
+        })()}
       </div>
       {error && <div className="mono" style={{ color: 'var(--alert-bright)', fontSize: 12 }}>{error}</div>}
-      {board && board.rows.length === 0 && (
+      {board && board.rows.every((r) => r.empty) && board.rows.length === 0 && (
         <div className="lbl" style={{ color: 'var(--ink-4)', padding: '18px 0' }}>
           no valid submissions here yet — be the first group
         </div>
