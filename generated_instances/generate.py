@@ -667,12 +667,15 @@ def main():
             parser.error(f"unknown parameter(s) for {args.model}: {', '.join(sorted(unknown))} "
                          f"(see --list-models)")
         try:
-            text, _ = models.build(args.model, params, seed=args.seed)
+            text, resolved = models.build(args.model, params, seed=args.seed)
         except ValueError as exc:
             parser.error(str(exc))
         os.makedirs(args.out_dir, exist_ok=True)
+        # The manifest row records the model's own skew and density.
         spec = InstanceSpec(name=args.name or args.model, tag=f"model: {args.model}",
-                            V=1, E=1, C=1, R=1, X=1, zipf_a=0.0, density=0.0)
+                            V=1, E=1, C=1, R=1, X=1,
+                            zipf_a=float(resolved.get("zipf_a", resolved.get("zipf", 0.0))),
+                            density=float(resolved.get("density", 0.0)))
         row = emit(spec, text, args.out_dir)
         write_manifest(args.out_dir, [row])
         print(f"\n  Wrote {spec.name}.in + manifest.csv to {os.path.abspath(args.out_dir)}/")
