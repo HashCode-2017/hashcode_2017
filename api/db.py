@@ -25,7 +25,7 @@ import time
 
 from . import ROOT
 
-GROUPS = ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "L"]   # the competing groups
+GROUPS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"]   # the competing groups
 PROFESSORS = "P"                                                     # admins, never ranked
 ALL_GROUPS = GROUPS + [PROFESSORS]
 GROUP_SIZE = 4

@@ -7,7 +7,7 @@
 create table if not exists hc_users (
     id          bigint generated always as identity primary key,
     username    text not null,
-    grp         text check (grp in ('A','B','C','D','E','F','G','H','J','K','L')),   -- null: the admin
+    grp         text check (grp in ('A','B','C','D','E','F','G','H','I','J','K','L')),   -- null: the admin
     salt        text not null,
     pw_hash     text not null,
     created     timestamptz not null default now()
@@ -79,7 +79,7 @@ alter table hc_sessions add column if not exists sb_refresh text;
 -- 'P' is the Professor group: admins who do not compete, so it has no seat cap.
 alter table hc_users drop constraint if exists hc_users_grp_check;
 alter table hc_users add constraint hc_users_grp_check
-    check (grp in ('A','B','C','D','E','F','G','H','J','K','L','P'));
+    check (grp in ('A','B','C','D','E','F','G','H','I','J','K','L','P'));
 
 create or replace function hc_group_cap() returns trigger language plpgsql as $$
 begin
@@ -120,3 +120,8 @@ create table if not exists hc_instances (
     created     timestamptz not null default now()
 );
 alter table hc_instances enable row level security;
+
+-- Group I joins the competing groups.
+alter table hc_users drop constraint if exists hc_users_grp_check;
+alter table hc_users add constraint hc_users_grp_check
+    check (grp in ('A','B','C','D','E','F','G','H','I','J','K','L','P'));
