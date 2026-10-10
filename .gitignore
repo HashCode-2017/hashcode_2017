@@ -13,3 +13,6 @@ ui/tsconfig.tsbuildinfo
 .env
 !requirements.txt
 .generated/
+out/
+delivery*/
+delivery*.zip
