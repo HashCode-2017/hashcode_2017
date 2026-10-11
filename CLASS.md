@@ -1,5 +1,7 @@
 # Class console — submit, visualise, rank
 
+**Live: https://hashcode2017-class-9b78b411b55f.herokuapp.com/**
+
 Every group has its own algorithm. The console doesn't care how you solved it or in which
 language: upload the file you would submit and it scores it, ranks it, and plays it back
 through all six acts of the story, ending on an animated reveal of your new rank.
