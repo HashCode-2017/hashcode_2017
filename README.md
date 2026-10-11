@@ -4,6 +4,10 @@
 A Python 3 solution for the Google Hash Code 2017 qualification-round
 "Streaming Videos" problem.
 
+**Class console (live): https://hashcode2017-class-9b78b411b55f.herokuapp.com/**
+Upload your group's `.out` (and optionally a `.trace`), watch your placement replay, and see
+the leaderboard. How it works and how to host it: [CLASS.md](CLASS.md).
+
 ## Requirements
 
 Python 3. The solver uses only the Python standard library.
