@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { api } from '../lib/api'
+import { api, type RunResult } from '../lib/api'
 import { useApp } from '../lib/store'
 import { compact, int } from '../lib/format'
 import { Chip, Label, Meter, Num, Panel, Stat } from '../components/Kit'
 import { RankBars } from '../viz/Charts'
+import { NeedSubmission } from './NeedSubmission'
 
 /**
  * Act 5. The file we would actually submit, the rules it has to satisfy, and
@@ -15,12 +16,32 @@ export function Submission() {
   const summary = useApp((s) => s.summary)
   const instances = useApp((s) => s.instances)
   const [scores, setScores] = useState<Record<string, number>>({})
+  const reveal = useApp((s) => s.reveal)
+  const setReveal = useApp((s) => s.setReveal)
+  const setShowRank = useApp((s) => s.setShowRank)
+  const mine = !!meta && meta.source !== 'solver'
+  const user = useApp((s) => s.user)
+  const needSubmission = useApp((s) => s.needSubmission)
 
-  // Pull every prewarmed run so the closing chart can compare data sets.
+  // A fresh upload ends on its rank: once, a beat after the last act opens.
+  useEffect(() => {
+    if (!result || !meta || reveal !== meta.id) return
+    const t = setTimeout(() => { setShowRank(meta.id); setReveal(null) }, 900)
+    return () => clearTimeout(t)
+  }, [result, meta, reveal, setReveal, setShowRank])
+
+  // Compare data sets: a player's own best on each; for the admin, the
+  // reference solver's prewarmed runs.
   useEffect(() => {
     let alive = true
     void (async () => {
       const out: Record<string, number> = {}
+      if (!user?.isAdmin) {
+        const subs = await api.mySubmissions().catch(() => [])
+        for (const s of subs) if (s.valid) out[s.instance] = Math.max(out[s.instance] ?? 0, s.score)
+        if (alive) setScores(out)
+        return
+      }
       for (const row of instances) {
         if (!row.prewarmed) continue
         try {
@@ -31,8 +52,9 @@ export function Submission() {
       if (alive) setScores(out)
     })()
     return () => { alive = false }
-  }, [instances])
+  }, [instances, user, result])
 
+  if (!result && needSubmission) return <NeedSubmission />
   if (!result || !meta || !summary) {
     return (
       <div style={{ display: 'grid', placeItems: 'center', height: '100%' }}>
@@ -138,7 +160,7 @@ export function Submission() {
           </p>
         </Panel>
 
-        <Panel title="all data sets" style={{ minHeight: 0 }}>
+        <Panel title={user?.isAdmin ? 'all data sets · reference solver' : "your group's best on each data set"} style={{ minHeight: 0 }}>
           <div style={{ overflowY: 'auto', height: '100%' }}>
             {Object.keys(scores).length ? (
               <RankBars
@@ -150,7 +172,7 @@ export function Submission() {
               />
             ) : (
               <span className="lbl" style={{ color: 'var(--ink-4)' }}>
-                prewarm the other data sets to compare
+                {user?.isAdmin ? 'prewarm the other data sets to compare' : 'submit on other data sets to compare'}
               </span>
             )}
             <p style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 14, lineHeight: 1.55 }}>
@@ -165,11 +187,18 @@ export function Submission() {
           <Stat label="final score" wide accent="ca">
             <Num value={result.score} />
           </Stat>
+          {mine && (
+            <button onClick={() => setShowRank(meta.id)} style={{
+              width: '100%', margin: '4px 0 10px', padding: '9px 0', fontSize: 12.5,
+              border: '1px solid var(--ca)', background: 'var(--ca-dim)', color: 'var(--ink-0)',
+            }}>show our group's rank ★</button>
+          )}
+          {result.trace && <TraceReport trace={result.trace} />}
           <Stat label="submission lines" note={`${int(result.replication.totalCopies)} video placements`}>
             {int(lines.length)}
           </Stat>
-          <Stat label="solve time"
-            note={meta.cached ? 'from the prewarmed run' : 'this session, live'}>
+          <Stat label={mine ? 'replay time' : 'solve time'}
+            note={mine ? 'rebuilding the run from your files' : meta.cached ? 'from the prewarmed run' : 'this session, live'}>
             {meta.solveSeconds != null ? `${meta.solveSeconds} s` : '—'}
           </Stat>
           <Stat label="parse time">{meta.parseSeconds != null ? `${meta.parseSeconds} s` : '—'}</Stat>
@@ -189,6 +218,29 @@ export function Submission() {
           </div>
         </div>
       </Panel>
+    </div>
+  )
+}
+
+function TraceReport({ trace }: { trace: NonNullable<RunResult['trace']> }) {
+  if (!trace.provided) {
+    return (
+      <Stat label="trace" note="upload a .trace to replay your algorithm's own order">none · .out replayed</Stat>
+    )
+  }
+  const problems = trace.problems ?? []
+  return (
+    <div style={{ padding: '10px 0', borderTop: '1px solid var(--line)' }}>
+      <Label>trace · {int(trace.steps)} steps</Label>
+      <Check ok={!!trace.consistent} label={trace.consistent ? 'ends exactly at your .out' : 'does not match your .out'}
+        detail={trace.consistent ? 'every cache agrees' : `${trace.differenceCount} caches differ; the .out is what is scored`} />
+      <Check ok={problems.length === 0} label={problems.length ? `${problems.length} step problem${problems.length > 1 ? 's' : ''}` : 'every step was legal'}
+        detail={problems.length ? '' : 'no overflow, no double add, no phantom remove'} />
+      {problems.slice(0, 6).map((p, i) => (
+        <div key={i} className="mono" style={{ fontSize: 10, color: 'var(--alert-bright)', paddingLeft: 21, lineHeight: 1.6 }}>
+          line {p.line}: {p.detail}
+        </div>
+      ))}
     </div>
   )
 }

@@ -141,7 +141,10 @@ def _matrix(inst: Instance, cache_rows, endpoint_rows):
     scrambled by arbitrary ids.
     """
     ep_order = [r["id"] for r in sorted(endpoint_rows, key=lambda r: -r["demand"])]
-    c_order = [r["id"] for r in sorted(cache_rows, key=lambda r: -r["degree"])]
+    # Caches no endpoint reaches can never serve anything: leave them out so the
+    # connected ones fill the width (the asymmetric instance uses 63 of 250).
+    c_order = [r["id"] for r in sorted(cache_rows, key=lambda r: -r["degree"]) if r["degree"] > 0]
+    unreachable = len(cache_rows) - len(c_order)
     rows = min(MATRIX_BUCKETS, len(ep_order))
     cols = min(MATRIX_BUCKETS, len(c_order))
     if rows == 0 or cols == 0:
@@ -166,8 +169,15 @@ def _matrix(inst: Instance, cache_rows, endpoint_rows):
     dens = [[count[r][c] for c in range(cols)] for r in range(rows)]
     return {
         "rows": rows, "cols": cols, "latency": cells, "density": dens,
-        "rowLabel": "endpoints, by demand", "colLabel": "caches, by connectivity",
+        "rowLabel": "endpoints, by demand", "colLabel": _cache_label(unreachable),
     }
+
+
+def _cache_label(unreachable):
+    if not unreachable:
+        return "caches, by connectivity"
+    return (f"caches, by connectivity · {unreachable} unreachable "
+            f"cache{'s' if unreachable != 1 else ''} not shown")
 
 
 def topology(inst: Instance, instance_id):
@@ -200,3 +210,41 @@ def topology(inst: Instance, instance_id):
 def file_head(path, limit=HEAD_BYTES):
     with open(path, "r", encoding="ascii") as f:
         return f.read(limit)
+
+
+def routed_matrix(inst: Instance, placed):
+    """Where requests are served from once the caches are filled, bucketed.
+
+    Same layout as `_matrix` (rows: endpoints by demand, columns: caches by
+    connectivity), so it reads as the "after" of the cold-network map. Each
+    cell is the request volume those endpoints get from those caches; the
+    extra `datacenter` column is what each row still fetches from the
+    datacenter. This is the routing view for data sets too dense to draw.
+    """
+    from .analysis import _best_source
+    demand = _endpoint_demand(inst)
+    ep_order = sorted(range(inst.E), key=lambda e: -demand[e])
+    c_order = sorted((c for c in range(inst.C) if inst.cache_endpoints.get(c)),
+                     key=lambda c: -len(inst.cache_endpoints[c]))
+    unreachable = inst.C - len(c_order)
+    rows = min(MATRIX_BUCKETS, len(ep_order))
+    cols = min(MATRIX_BUCKETS, len(c_order))
+    if rows == 0 or cols == 0:
+        return None
+    ep_bucket = {e: min(rows - 1, i * rows // len(ep_order)) for i, e in enumerate(ep_order)}
+    c_bucket = {c: min(cols - 1, i * cols // len(c_order)) for i, c in enumerate(c_order)}
+
+    best = _best_source(inst, placed)
+    served = [[0] * cols for _ in range(rows)]
+    datacenter = [0] * rows
+    for v, e, n in inst.requests:
+        slot = best.get(e)
+        hit = slot.get(v) if slot else None
+        if hit:
+            served[ep_bucket[e]][c_bucket.get(hit[1], 0)] += n
+        else:
+            datacenter[ep_bucket[e]] += n
+    return {
+        "rows": rows, "cols": cols, "served": served, "datacenter": datacenter,
+        "rowLabel": "endpoints, by demand", "colLabel": _cache_label(unreachable),
+    }

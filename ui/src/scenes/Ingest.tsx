@@ -14,6 +14,7 @@ import { Histogram } from '../viz/Histogram'
  */
 export function Ingest() {
   const summary = useApp((s) => s.summary)
+  const setGeneratorOpen = useApp((s) => s.setGeneratorOpen)
   const [typed, setTyped] = useState(0)
 
   useEffect(() => {
@@ -42,7 +43,12 @@ export function Ingest() {
       gap: 1, background: 'var(--line)', height: '100%', minHeight: 0,
     }}>
       {/* raw bytes */}
-      <Panel title={`${summary.id}.in — first bytes`} flush style={{ minHeight: 0 }}>
+      <Panel title={`${summary.id}.in — first bytes`} flush style={{ minHeight: 0 }}
+        right={
+          <button onClick={() => setGeneratorOpen(true)} className="lbl" style={{
+            border: '1px solid var(--ca-dim)', padding: '3px 9px', color: 'var(--ca-bright)',
+          }}>+ generate a new instance</button>
+        }>
         <div className="mono" style={{
           height: '100%', overflow: 'hidden', padding: 12, fontSize: 10.5,
           lineHeight: 1.55, color: 'var(--ink-2)', whiteSpace: 'pre-wrap', wordBreak: 'break-all',

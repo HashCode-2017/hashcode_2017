@@ -8,3 +8,11 @@ ui/tsconfig.tsbuildinfo
 *.pptx
 *.pdf
 *.txt
+*.in
+.data/
+.env
+!requirements.txt
+.generated/
+out/
+delivery*/
+delivery*.zip
