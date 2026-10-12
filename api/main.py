@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import ROOT, instances as inst_mod, viewmodel, runs, db, replay
+from . import ROOT, instances as inst_mod, viewmodel, runs, db, replay, class_sheet
 
 app = FastAPI(title="Streaming Videos Console", version="1.0")
 
@@ -294,6 +294,22 @@ def api_set_group(user_id: int, body: GroupChange, admin=Depends(admin_user)):
         return db.set_group(user_id, body.group)
     except db.AuthError as exc:
         raise HTTPException(400, str(exc))
+
+
+# ------------------------------------------------------------ class sheet
+
+@app.get("/api/class-sheet")
+def api_class_sheet(user=Depends(current_user)):
+    return class_sheet.current_view()
+
+
+@app.post("/api/admin/class-sheet/sync")
+def api_class_sheet_sync(admin=Depends(admin_user)):
+    try:
+        result = class_sheet.sync(admin["username"])
+    except class_sheet.SheetError as exc:
+        raise HTTPException(502, str(exc))
+    return {**result, "view": class_sheet.current_view()}
 
 
 # ------------------------------------------------------ instance generator

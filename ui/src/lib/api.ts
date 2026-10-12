@@ -186,6 +186,27 @@ async function send<T>(method: string, url: string, body: unknown): Promise<T> {
   return r.json() as Promise<T>
 }
 
+export interface SheetChange {
+  section: string; instance: string; group: string
+  old: number | null; new: number | null
+}
+export interface SheetSync { at: number; by: string; count: number; changes: SheetChange[] }
+export interface SheetInstance {
+  name: string; vbs: number | null; best: number | null
+  scores: Record<string, number>; ranks: Record<string, number>
+}
+export interface SheetGroup {
+  group: string; total: number; scored: number; rank: number | null
+  gap: number; world_rank: number | null; best_count: number
+}
+export interface SheetSection { title: string; instances: SheetInstance[]; vbs_total: number; groups: SheetGroup[] }
+export interface ClassSheet {
+  empty?: boolean; source: string
+  synced_at?: number; synced_by?: string; groups?: string[]
+  sections?: SheetSection[]; last_sync?: SheetSync | null
+}
+export interface SheetSyncResult { changed: number; changes: SheetChange[]; synced_at: number | null; view: ClassSheet }
+
 export const api = {
   instances: () => get<InstanceRow[]>('/api/instances'),
   summary: (id: string) => get<Summary>(`/api/instances/${id}`),
@@ -226,6 +247,8 @@ export const api = {
   people: () => get<Person[]>('/api/admin/people'),
   setGroup: (userId: number, group: string) => send<User>('PUT', `/api/admin/people/${userId}/group`, { group }),
   setRanked: (instances: string[]) => send<{ instances: string[] }>('PUT', '/api/admin/ranked', { instances }),
+  classSheet: () => get<ClassSheet>('/api/class-sheet'),
+  syncClassSheet: () => post<SheetSyncResult>('/api/admin/class-sheet/sync', {}),
   rank: (runId: string) => get<RankReport>(`/api/submissions/${runId}/rank`),
   leaderboard: (scope: string, by: 'user' | 'group') =>
     get<Board>(`/api/leaderboard?scope=${encodeURIComponent(scope)}&by=${by}`),
