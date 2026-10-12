@@ -14,6 +14,7 @@ import { Submit } from './scenes/Submit'
 import { Leaderboard } from './scenes/Leaderboard'
 import { Stats } from './scenes/Stats'
 import { Admin } from './scenes/Admin'
+import { ClassSheet } from './scenes/ClassSheet'
 import { RankReveal } from './components/RankReveal'
 import { GenerateDialog } from './components/GenerateDialog'
 
@@ -70,6 +71,7 @@ export default function App() {
   const body = page === 'submit' ? <Submit />
     : page === 'leaderboard' ? <Leaderboard />
     : page === 'stats' ? <Stats />
+    : page === 'sheet' ? <ClassSheet />
     : page === 'admin' ? <Admin />
     : explore ? <Explore /> : <Scene />
 
@@ -212,7 +214,8 @@ function Rail() {
       <div style={{ padding: '6px 0', borderTop: '1px solid var(--line)' }}>
         {([['leaderboard', 'Leaderboard', 'players & groups'],
            ['stats', 'Statistics', 'this run & the class'],
-           ...(user?.isAdmin ? [['admin', 'Admin', 'ranked data sets & groups']] as const : [])] as const).map(([p, name, sub]) => (
+           ['sheet', 'Class sheet', 'every group, every instance'],
+           ...(user?.isAdmin ? [['admin', 'Admin', 'ranked sets, groups, sheet']] as const : [])] as const).map(([p, name, sub]) => (
           <button key={p} onClick={() => openPage(page === p ? null : p)} style={{
             display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px',
             background: page === p ? 'var(--panel-2)' : 'transparent',
@@ -278,11 +281,12 @@ function TopBar() {
   const user = useApp((s) => s.user)
   const logout = useApp((s) => s.logout)
 
-  const title = page === 'submit' ? 'Submit' : page === 'leaderboard' ? 'Leaderboard' : page === 'stats' ? 'Statistics' : page === 'admin' ? 'Admin'
+  const title = page === 'submit' ? 'Submit' : page === 'leaderboard' ? 'Leaderboard' : page === 'stats' ? 'Statistics' : page === 'sheet' ? 'Class sheet' : page === 'admin' ? 'Admin'
     : explore ? 'Free explore' : ACTS[act].name
   const sub = page === 'submit' ? 'any language, any algorithm'
     : page === 'leaderboard' ? 'best score per data set'
     : page === 'stats' ? 'caches, endpoints, players, groups'
+    : page === 'sheet' ? 'the shared score sheet, mirrored'
     : page === 'admin' ? 'what counts, and who is where'
     : explore ? 'inspect any cache, endpoint or video' : ACTS[act].sub
 

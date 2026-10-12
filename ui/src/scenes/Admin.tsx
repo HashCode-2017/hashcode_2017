@@ -3,6 +3,7 @@ import { api, type GroupSeat, type Person } from '../lib/api'
 import { useApp } from '../lib/store'
 import { bytes, int } from '../lib/format'
 import { Chip, Label, Panel } from '../components/Kit'
+import { SyncButton } from './ClassSheet'
 
 /**
  * Two decisions only the admin makes: which data sets add up to the final
@@ -16,11 +17,32 @@ export function Admin() {
   }
   return (
     <div style={{
-      display: 'grid', gridTemplateColumns: 'minmax(380px, 1fr) minmax(420px, 1.2fr)', gap: 1,
-      background: 'var(--line)', height: '100%', minHeight: 0,
+      display: 'grid', gridTemplateColumns: 'minmax(380px, 1fr) minmax(420px, 1.2fr)', gridTemplateRows: 'auto 1fr',
+      gap: 1, background: 'var(--line)', height: '100%', minHeight: 0,
     }}>
+      <SheetSync />
       <RankedSets />
       <People />
+    </div>
+  )
+}
+
+/** Pull the class's shared score sheet into the "Class sheet" page. */
+function SheetSync() {
+  const openPage = useApp((s) => s.openPage)
+  return (
+    <div style={{
+      gridColumn: '1 / -1', background: 'var(--panel)', padding: '12px 14px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
+    }}>
+      <div>
+        <Label>class sheet</Label>
+        <div style={{ fontSize: 12.5, color: 'var(--ink-2)', marginTop: 4 }}>
+          Fetches the shared Google Sheet and stores any score that changed.{' '}
+          <button className="lbl" onClick={() => openPage('sheet')} style={{ color: 'var(--ca-bright)' }}>open the page →</button>
+        </div>
+      </div>
+      <SyncButton />
     </div>
   )
 }

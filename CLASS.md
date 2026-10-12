@@ -63,6 +63,14 @@ links). A latest upload that overflows a cache counts 0 until the group submits 
 Ties go to the group that settled on its result first. Every other data set has its own
 practice board.
 
+### Class sheet
+
+The **Class sheet** page shows the scores every group reported in the class's shared
+[Google Sheet](https://docs.google.com/spreadsheets/d/14uP3Iylm2Srmv9AOk9OhVznN6wd00v6XgQnqnTk3riw/edit?gid=0),
+including instances that were never uploaded to the console: standings per section, every
+instance against the VBS, and what changed in the last update. It is read-only and separate
+from the leaderboard; nothing on it is re-scored.
+
 ## For whoever hosts it
 
 ```bash
@@ -86,7 +94,10 @@ group at sign-up needs `ADMIN_CODE` from `.env`, so hand it only to those people
 also move anyone into or out of any group from the **Admin** page. Professors take no seat and
 are never ranked; group D competes like every other group. On first start the server creates
 the `ADMIN_EMAIL` user from `ADMIN_PASSWORD`; after that its password belongs to Supabase.
-The **Admin** page picks the evaluation data sets that make up the final ranking. Only admins
+The **Admin** page picks the evaluation data sets that make up the final ranking, and its
+**sync from sheet** button pulls the class sheet in (it reads the sheet's public CSV export, so
+the sheet must stay viewable by anyone with the link). The same sync runs from a terminal with
+`python -m api.class_sheet`, against whichever store `.env` points to. Only admins
 can run the reference solver; players only ever see their own group's submissions.
 
 **Storage.** With `SUPABASE_URL` and `SUPABASE_SECRET_KEY` in `.env` (gitignored), accounts and

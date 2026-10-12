@@ -13,7 +13,7 @@ export const ACTS = [
 ] as const
 
 /** Screens outside the six-act story. */
-export type Page = 'submit' | 'leaderboard' | 'stats' | 'admin'
+export type Page = 'submit' | 'leaderboard' | 'stats' | 'sheet' | 'admin'
 
 interface App {
   user: User | null
