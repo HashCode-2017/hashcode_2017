@@ -12,6 +12,13 @@ the leaderboard. How it works and how to host it: [CLASS.md](CLASS.md).
 plus an exact solver for small instances. Step by step, with complexity and results:
 [PIPELINE.md](PIPELINE.md).
 
+```bash
+python solve.py input.in output.out --time 300   # best submission for one data set
+python runner/server.py                         # web page: drop .in files, get scores and .out files
+```
+
+Both need `g++` (the solver is compiled on first use), and the exact solver needs `scipy`.
+
 ## Requirements
 
 Python 3. The solver uses only the Python standard library.

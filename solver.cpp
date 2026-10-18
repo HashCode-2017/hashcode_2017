@@ -9,7 +9,11 @@
 // Usage:  solver <input.in> <output.out> [--rounds 5] [--strategy global|per-cache]
 //                [--no-evict] [--no-swap] [--repack] [--candidates 400]
 //                [--kicks N] [--kick-size 3] [--lns SECONDS] [--lns-size 2]
-//                [--seed 1] [--start file.out]
+//                [--seed 1] [--start file.out] [--time-limit SECONDS]
+//
+// --time-limit caps the whole run: the first greedy round always completes
+// (so there is a valid answer), every later step stops when time is up, and
+// the best solution found so far is written.
 //
 // --start skips the greedy and starts from an existing submission.
 // Ties between equal candidates may be broken differently from the Python
@@ -18,6 +22,15 @@
 #include <bits/stdc++.h>
 using namespace std;
 typedef long long ll;
+
+// Wall-clock budget for the whole run (--time-limit). Every improvement loop
+// checks it between steps, so the run stops on time with a valid solution.
+static chrono::steady_clock::time_point g_deadline = chrono::steady_clock::time_point::max();
+static bool timeUp() { return chrono::steady_clock::now() >= g_deadline; }
+static double secondsLeft() {
+    if (g_deadline == chrono::steady_clock::time_point::max()) return 1e18;
+    return max(0.0, chrono::duration<double>(g_deadline - chrono::steady_clock::now()).count());
+}
 
 struct Inst {
     int V = 0, E = 0, R = 0, C = 0, X = 0;
@@ -371,6 +384,7 @@ struct Solver {
 
     void solve(int rounds, bool global, bool evict, bool swap) {
         for (int round = 0; round < rounds; ++round) {
+            if (round > 0 && timeUp()) break;     // round 1 always runs
             int placed = global ? globalFill() : perCacheFill();
             int evicted = evict ? evictDeadWeight() : 0;
             int swapped = swap ? swapPass() : 0;
@@ -501,9 +515,13 @@ struct Repacker {
         ll total = 0;
         for (;;) {
             ll gained = 0;
-            for (int c : order) gained += repack(c, candidates);
+            for (int c : order) {
+                if (timeUp()) return total + gained;
+                gained += repack(c, candidates);
+            }
             total += gained;
-            if (log) fprintf(stderr, "  re-pack sweep +%lld pts\n", gained * 1000 / in.totalReq);
+            if (log) fprintf(stderr, "  re-pack sweep +%lld pts -> %lld\n", gained * 1000 / in.totalReq,
+                             saved() * 1000 / in.totalReq);
             if (!gained) return total;
         }
     }
@@ -555,9 +573,19 @@ static void lns(Repacker& rp, double seconds, int k, int candidates, mt19937_64&
     auto rnd = [&](size_t n) { return (size_t)(rng() % n); };
     vector<char> mark(in.E, 0);
 
+    seconds = min(seconds, secondsLeft());
     auto start = chrono::steady_clock::now();
     long long iters = 0, kept = 0, better = 0;
+    // Running total of the saving, kept up to date from the local deltas, so
+    // progress can be reported every couple of seconds without a full re-score.
+    ll total = rp.saved();
+    double lastReport = -2;
     while (chrono::duration<double>(chrono::steady_clock::now() - start).count() < seconds) {
+        double t = chrono::duration<double>(chrono::steady_clock::now() - start).count();
+        if (t - lastReport >= 2) {
+            fprintf(stderr, "  lns score %lld\n", total * 1000 / in.totalReq);
+            lastReport = t;
+        }
         ++iters;
         vector<int> group{caches[rnd(caches.size())]};
         for (int tries = 0; (int)group.size() < k && tries < 20 * k; ++tries) {
@@ -582,7 +610,7 @@ static void lns(Repacker& rp, double seconds, int k, int candidates, mt19937_64&
         shuffle(order.begin(), order.end(), rng);
         rp.sweepUntilStable(candidates, order, false);
         ll after = local();
-        if (after >= before) { ++kept; better += after > before; }
+        if (after >= before) { ++kept; better += after > before; total += after - before; }
         else for (size_t i = 0; i < group.size(); ++i) rp.setCache(group[i], old[i]);
         for (int e : eps) mark[e] = 0;
     }
@@ -602,7 +630,7 @@ int main(int argc, char** argv) {
     unsigned seed = 1;
     bool global = true, evict = true, swap = true, repack = false;
     const char* start = nullptr;
-    double lnsSeconds = 0;
+    double lnsSeconds = 0, timeLimit = 0;
     int lnsSize = 2;
     for (int i = 3; i < argc; ++i) {
         string a = argv[i];
@@ -619,11 +647,14 @@ int main(int argc, char** argv) {
         else if (a == "--start") start = val();
         else if (a == "--lns") { lnsSeconds = atof(val()); repack = true; }
         else if (a == "--lns-size") lnsSize = atoi(val());
+        else if (a == "--time-limit") timeLimit = atof(val());
         else { fprintf(stderr, "unknown option %s\n", a.c_str()); return 1; }
     }
 
     auto t0 = chrono::steady_clock::now();
     auto secs = [&]() { return chrono::duration<double>(chrono::steady_clock::now() - t0).count(); };
+    if (timeLimit > 0)
+        g_deadline = t0 + chrono::duration_cast<chrono::steady_clock::duration>(chrono::duration<double>(timeLimit));
 
     Inst in = parse(inPath);
     fprintf(stderr, "%s: V=%d E=%d R=%d C=%d X=%d (%.1fs)\n", inPath, in.V, in.E, in.R, in.C, in.X, secs());
@@ -649,7 +680,7 @@ int main(int argc, char** argv) {
 
         mt19937 rng(seed);
         vector<vector<int>> bestLists = p.list;
-        for (int k = 0; k < kicks; ++k) {
+        for (int k = 0; k < kicks && !timeUp(); ++k) {
             vector<int> pick = order;
             shuffle(pick.begin(), pick.end(), rng);
             for (int i = 0; i < min(kickSize, in.C); ++i) rp.setCache(pick[i], {});

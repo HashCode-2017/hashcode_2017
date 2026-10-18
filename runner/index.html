@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Streaming Videos solver</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%2314213A%27/%3E%3Crect x=%273%27 y=%2711%27 width=%2710%27 height=%272%27 fill=%27%23E39B2D%27/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EDF0F3;
+    --panel: #FFFFFF;
+    --ink: #14213A;
+    --slate: #5A6A80;
+    --faint: #93A0B2;
+    --rule: #D5DCE4;
+    --amber: #E39B2D;
+    --amber-soft: #FBEFDB;
+    --green: #2E7D5B;
+    --green-soft: #DDEFE6;
+    --red: #B3443A;
+    --red-soft: #F6E1DE;
+    --focus: #2F6FD6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #121A28;
+      --panel: #1A2436;
+      --ink: #E6ECF4;
+      --slate: #9AA8BC;
+      --faint: #6C7A8F;
+      --rule: #2C3950;
+      --amber: #F0AE4A;
+      --amber-soft: #3A2E1A;
+      --green: #5BBE8F;
+      --green-soft: #183327;
+      --red: #E2766C;
+      --red-soft: #3A1F1E;
+      --focus: #7FA8F0;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--paper); }
+  body {
+    margin: 0; color: var(--ink); background: var(--paper);
+    font: 400 15px/1.5 "Familjen Grotesk", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  main { max-width: 1120px; margin: 0 auto; padding: 40px 24px 64px; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+
+  header h1 { font-size: 34px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; }
+  header p { margin: 0; color: var(--slate); max-width: 66ch; }
+
+  .intake { display: grid; grid-template-columns: 1fr 320px; gap: 16px; margin-top: 28px; }
+  .drop {
+    position: relative; min-height: 210px; border: 2px dashed var(--rule); border-radius: 14px;
+    background: var(--panel); display: grid; place-items: center; text-align: center; padding: 24px;
+    transition: border-color .15s, background .15s;
+  }
+  .drop.over { border-color: var(--amber); background: var(--amber-soft); }
+  .drop strong { display: block; font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .drop span { color: var(--slate); }
+  .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .drop .pick { text-decoration: underline; text-underline-offset: 3px; color: var(--ink); }
+
+  .settings { background: var(--panel); border-radius: 14px; padding: 18px 18px 14px; border: 1px solid var(--rule); }
+  .settings h2 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+  .settings + .settings { margin-top: 0; }
+  .field { margin-bottom: 16px; }
+  .field:last-child { margin-bottom: 0; }
+  .hint { color: var(--slate); font-size: 13px; margin: 6px 0 0; }
+  .seg { display: flex; border: 1px solid var(--rule); border-radius: 9px; overflow: hidden; }
+  .seg button { flex: 1; padding: 7px 0; background: transparent; border: 0; border-right: 1px solid var(--rule); font-weight: 500; }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .stepper { display: flex; align-items: center; gap: 10px; }
+  .stepper button { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--rule); background: transparent; font-size: 18px; line-height: 1; }
+  .stepper output { min-width: 2ch; text-align: center; font-weight: 600; font-size: 17px; }
+
+  .library { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--slate); font-size: 14px; }
+  .library button {
+    border: 1px solid var(--rule); background: var(--panel); border-radius: 999px; padding: 4px 12px; font-size: 14px;
+  }
+  .library button:hover { border-color: var(--ink); }
+
+  .notice { margin-top: 18px; padding: 10px 14px; border-radius: 10px; background: var(--red-soft); color: var(--red); font-weight: 500; }
+  .notice[hidden] { display: none; }
+
+  .results { margin-top: 32px; }
+  .results-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+  .results-head h2 { font-size: 22px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+  .actions { display: flex; gap: 8px; }
+  .btn { border-radius: 9px; padding: 8px 14px; font-weight: 600; border: 1px solid var(--rule); background: var(--panel); }
+  .btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .btn:disabled { opacity: .45; cursor: default; }
+
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 14px; overflow: hidden; border: 1px solid var(--rule); }
+  th { text-align: left; font-weight: 500; color: var(--slate); font-size: 13px; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
+  td { padding: 12px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  tbody tr { position: relative; }
+  tbody tr:last-child td { border-bottom: 0; }
+  th.num, td.num { text-align: right; }
+  .name { font-weight: 600; word-break: break-all; }
+  .dims { color: var(--slate); font-size: 13px; }
+  .score { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  .muted { color: var(--faint); }
+
+  .status { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); flex: none; }
+  .running .dot { background: var(--amber); animation: pulse 1.2s ease-in-out infinite; }
+  .done .dot { background: var(--green); }
+  .error .dot { background: var(--red); }
+  .phase { display: block; color: var(--slate); font-size: 13px; font-weight: 400; }
+
+  /* Pipeline checklist: the steps run in this order, so an ordered list. */
+  .steps { list-style: none; margin: 8px 0 0; padding: 0; font-size: 13px; }
+  .steps li { display: grid; grid-template-columns: 16px auto 1fr; align-items: baseline; gap: 0 7px; padding: 1px 0; color: var(--slate); }
+  .steps .mark { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--faint); align-self: center; justify-self: center; }
+  .steps .label { white-space: nowrap; }
+  .steps .detail { color: var(--faint); overflow-wrap: anywhere; }
+  .steps .done { color: var(--ink); }
+  .steps .done .mark { border: 0; width: 12px; height: 12px; background: var(--green);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.2 6.4l2.4 2.4 5.2-5.6' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.2 6.4l2.4 2.4 5.2-5.6' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; }
+  .steps .active { color: var(--ink); font-weight: 600; }
+  .steps .active .mark { border: 0; background: var(--amber); animation: pulse 1.2s ease-in-out infinite; }
+  .steps .active .detail { color: var(--slate); font-weight: 400; }
+  .steps .skipped .label { text-decoration: line-through; color: var(--faint); }
+  .steps .skipped .mark { border-style: dashed; }
+  .live { display: block; color: var(--slate); font-size: 12.5px; margin-top: 2px; }
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  /* The one memorable element: each running row drains its time budget along its bottom edge. */
+  .budget { position: absolute; left: 0; bottom: -1px; height: 3px; background: var(--amber); }
+
+  .tag { display: inline-block; font-size: 12.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px; }
+  .tag.opt { background: var(--green-soft); color: var(--green); }
+  .tag.gap { background: var(--amber-soft); color: var(--ink); }
+  .method { display: block; margin-top: 4px; color: var(--slate); font-size: 13px; }
+  .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+  .link { background: none; border: 0; padding: 4px 6px; font-weight: 600; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .link.quiet { color: var(--slate); font-weight: 500; }
+
+  tfoot td { border-top: 2px solid var(--ink); border-bottom: 0; font-weight: 700; }
+  tfoot .score { font-size: 22px; }
+
+  .empty { padding: 34px 14px; text-align: center; color: var(--slate); }
+
+  @media (max-width: 820px) {
+    main { padding: 28px 16px 48px; }
+    .intake { grid-template-columns: 1fr; }
+    .col-time, .col-how { display: none; }
+  }
+  @media (max-width: 600px) {
+    header h1 { font-size: 28px; }
+    table, tbody, tfoot, tr, td { display: block; }
+    thead { display: none; }
+    tbody tr, tfoot tr {
+      display: grid; grid-template-columns: 1fr auto; gap: 6px 12px;
+      padding: 12px 14px; border-bottom: 1px solid var(--rule);
+    }
+    tbody tr:last-child { border-bottom: 0; }
+    td, tfoot td { padding: 0; border: 0; }
+    td:nth-child(1) { grid-area: 1 / 1; }
+    td:nth-child(3) { grid-area: 1 / 2; }
+    td:nth-child(2) { grid-area: 2 / 1 / 3 / 3; }
+    td:nth-child(6) { grid-area: 3 / 1 / 4 / 3; }
+    td:nth-child(6) .row-actions { justify-content: flex-start; margin-left: -6px; }
+    td:nth-child(6):empty, td:nth-child(6):has(.row-actions:empty) { display: none; }
+    td.empty { grid-column: 1 / -1; }
+    tfoot tr { border-top: 2px solid var(--ink); border-bottom: 0; }
+    tfoot td:nth-child(2):empty { display: none; }
+    .name { word-break: normal; overflow-wrap: anywhere; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .running .dot { animation: none; }
+    .drop { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Streaming Videos solver</h1>
+    <p>Drop Hash Code 2017 input files. Each one goes through our greedy, the exact re-pack of every
+      cache and the large neighbourhood search, plus the exact solver when the data set is small
+      enough. You get the best valid <code>.out</code> and its score.</p>
+  </header>
+
+  <section class="intake" aria-label="Add data sets">
+    <div>
+      <label class="drop" id="drop">
+        <input type="file" id="files" accept=".in" multiple aria-label="Choose .in files">
+        <div>
+          <strong>Drop .in files here</strong>
+          <span>or <span class="pick">choose files</span>. They start as soon as they are added.</span>
+        </div>
+      </label>
+      <div class="library" id="library" hidden></div>
+    </div>
+
+    <div class="settings">
+      <div class="field">
+        <h2 id="budget-label">Time per data set</h2>
+        <div class="seg" role="group" aria-labelledby="budget-label" id="budget"></div>
+        <p class="hint">More time lets the search improve large data sets further. Small ones finish early.</p>
+      </div>
+      <div class="field">
+        <h2 id="par-label">Data sets at the same time</h2>
+        <div class="stepper" role="group" aria-labelledby="par-label">
+          <button type="button" id="par-down" aria-label="Fewer at the same time">−</button>
+          <output id="par">4</output>
+          <button type="button" id="par-up" aria-label="More at the same time">+</button>
+        </div>
+        <p class="hint">Each run uses one or two CPU cores.</p>
+      </div>
+    </div>
+  </section>
+
+  <p class="notice" id="notice" role="alert" hidden></p>
+
+  <section class="results" aria-label="Results">
+    <div class="results-head">
+      <h2>Results</h2>
+      <div class="actions">
+        <button class="btn" id="clear" type="button">Clear finished</button>
+        <button class="btn primary" id="zip" type="button">Download all (.zip)</button>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Data set</th>
+          <th>Status</th>
+          <th class="num">Score</th>
+          <th class="col-how">How it was solved</th>
+          <th class="num col-time">Time</th>
+          <th><span class="visually-hidden" style="position:absolute;left:-9999px">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+      <tfoot id="foot"></tfoot>
+    </table>
+  </section>
+</main>
+
+<script>
+const BUDGETS = [[30, '30 s'], [120, '2 min'], [300, '5 min'], [600, '10 min']];
+let budget = 120;
+try { budget = Number(localStorage.getItem('budget')) || budget; } catch (e) {}
+let state = { jobs: [], parallel: 4, now: Date.now() / 1000 };
+
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => n.toLocaleString('en-US');
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const size = (b) => b > 1e6 ? (b / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1e3)) + ' kB';
+const dur = (s) => s < 60 ? Math.round(s) + ' s' : Math.floor(s / 60) + ' min ' + String(Math.round(s % 60)).padStart(2, '0') + ' s';
+
+function notice(msg) {
+  const n = $('notice');
+  n.textContent = msg || '';
+  n.hidden = !msg;
+}
+
+async function call(method, url, body) {
+  const r = await fetch(url, { method, body });
+  if (!r.ok) {
+    let msg = r.status + ' ' + r.statusText;
+    try { const j = await r.json(); if (j.detail) msg = j.detail; } catch (e) {}
+    throw new Error(msg);
+  }
+  return r.json();
+}
+
+// ---- settings
+function drawBudget() {
+  $('budget').innerHTML = BUDGETS.map(([s, label]) =>
+    `<button type="button" data-s="${s}" aria-pressed="${s === budget}">${label}</button>`).join('');
+}
+$('budget').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  budget = Number(b.dataset.s);
+  try { localStorage.setItem('budget', budget); } catch (err) {}
+  drawBudget();
+});
+async function setParallel(n) {
+  try { const r = await call('PUT', '/api/parallel/' + n); state.parallel = r.parallel; $('par').textContent = r.parallel; }
+  catch (e) { notice(e.message); }
+}
+$('par-down').onclick = () => setParallel(state.parallel - 1);
+$('par-up').onclick = () => setParallel(state.parallel + 1);
+
+// ---- adding files
+async function addFiles(list) {
+  const files = [...list].filter((f) => f.name.endsWith('.in'));
+  const skipped = list.length - files.length;
+  notice(skipped ? `${skipped} file${skipped > 1 ? 's were' : ' was'} skipped: only .in files can be solved.` : '');
+  for (const f of files) {
+    try { await call('POST', `/api/jobs?name=${encodeURIComponent(f.name)}&budget=${budget}`, f); }
+    catch (e) { notice(e.message); }
+  }
+  refresh();
+}
+const drop = $('drop');
+$('files').addEventListener('change', (e) => { addFiles(e.target.files); e.target.value = ''; });
+['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', (e) => addFiles(e.dataTransfer.files));
+
+async function loadLibrary() {
+  try {
+    const files = await call('GET', '/api/library');
+    if (!files.length) return;
+    const lib = $('library');
+    lib.innerHTML = 'From this repo:' + files.map((f) =>
+      `<button type="button" data-name="${esc(f.name)}">${esc(f.name.replace(/\.in$/, ''))}</button>`).join('') +
+      `<button type="button" data-all="1">all ${files.length}</button>`;
+    lib.hidden = false;
+    lib.addEventListener('click', async (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      const names = b.dataset.all ? files.map((f) => f.name) : [b.dataset.name];
+      for (const n of names) {
+        try { await call('POST', `/api/library/${encodeURIComponent(n)}?budget=${budget}`); }
+        catch (err) { notice(err.message); }
+      }
+      refresh();
+    });
+  } catch (e) { /* the library is optional */ }
+}
+
+// ---- results
+const STATE_WORD = { done: 'done', active: 'in progress', pending: 'not started', skipped: 'skipped' };
+function steps(j) {
+  const list = (j.result && j.result.steps) || (j.progress && j.progress.steps);
+  if (!list || j.status === 'queued') return '';
+  return '<ol class="steps">' + list.map((s) => `<li class="${s.state}">
+      <span class="mark" aria-hidden="true"></span>
+      <span class="label">${esc(s.label)}<span class="visually-hidden" style="position:absolute;left:-9999px">, ${STATE_WORD[s.state]}</span></span>
+      <span class="detail">${esc(s.detail)}</span></li>`).join('') + '</ol>';
+}
+
+function row(j) {
+  const r = j.result;
+  const best = j.progress ? j.progress.best : null;
+  const dims = r ? `${fmt(r.V)} videos, ${fmt(r.C)} caches, ${fmt(r.R)} requests` : size(j.bytes);
+  let status, phase = '';
+  if (j.status === 'queued') { status = 'Waiting'; phase = 'starts when a slot frees up'; }
+  else if (j.status === 'running') { status = 'Solving'; }
+  else if (j.status === 'done') { status = 'Done'; }
+  else { status = 'Failed'; phase = j.error; }
+
+  let how = '<span class="muted">–</span>';
+  if (r) {
+    let tag = '';
+    if (r.optimal) tag = '<span class="tag opt">proven optimum</span>';
+    else if (r.bound) {
+      const gap = (r.bound - r.score) / r.bound * 100;
+      tag = `<span class="tag gap">at most ${gap < 0.01 ? '<0.01' : gap.toFixed(2)}% below optimum</span>`;
+    }
+    how = `${tag}<span class="method">${esc(r.method.replace(' (proven optimum)', ' solver'))}</span>`;
+  }
+
+  let time = '<span class="muted">–</span>';
+  let bar = '';
+  if (j.status === 'running') {
+    const el = state.now - j.started;
+    time = dur(el) + ` <span class="muted">/ ${dur(j.budget)}</span>`;
+    bar = `<div class="budget" style="width:${Math.min(100, el / j.budget * 100).toFixed(1)}%"></div>`;
+  } else if (r) time = dur(r.seconds);
+
+  const actions = j.status === 'done'
+    ? `<a class="link" href="/api/jobs/${j.id}/out" download>Download .out</a>
+       <button class="link quiet" type="button" data-remove="${j.id}">Remove</button>`
+    : j.status === 'running' ? '' : `<button class="link quiet" type="button" data-remove="${j.id}">Remove</button>`;
+
+  return `<tr class="${j.status === 'error' ? 'error' : j.status}">
+    <td><span class="name">${esc(j.name)}</span><span class="dims" style="display:block">${dims}</span></td>
+    <td><span class="status"><span class="dot" aria-hidden="true"></span>${status}</span>${phase ? `<span class="phase">${esc(phase)}</span>` : ''}${steps(j)}</td>
+    <td class="num">${r ? `<span class="score">${fmt(r.score)}</span>`
+      : best != null ? `<span class="score muted">${fmt(best)}</span><span class="live">best so far</span>`
+      : '<span class="muted">–</span>'}</td>
+    <td class="col-how">${how}</td>
+    <td class="num col-time">${time}</td>
+    <td><div class="row-actions">${actions}</div>${bar}</td>
+  </tr>`;
+}
+
+function render() {
+  const jobs = state.jobs;
+  $('par').textContent = state.parallel;
+  $('rows').innerHTML = jobs.length ? jobs.map(row).join('')
+    : `<tr><td colspan="6" class="empty">No runs yet. Drop .in files above, or pick a data set from this repo.</td></tr>`;
+  const done = jobs.filter((j) => j.status === 'done');
+  const active = jobs.filter((j) => j.status === 'queued' || j.status === 'running').length;
+  $('foot').innerHTML = done.length ? `<tr>
+      <td>Total of ${done.length} finished</td>
+      <td>${active ? `${active} still running or waiting` : ''}</td>
+      <td class="num"><span class="score">${fmt(done.reduce((a, j) => a + j.result.score, 0))}</span></td>
+      <td class="col-how"></td><td class="col-time"></td><td></td></tr>` : '';
+  $('zip').disabled = !done.length;
+  $('clear').disabled = !jobs.some((j) => j.status === 'done' || j.status === 'error');
+}
+
+$('rows').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-remove]'); if (!b) return;
+  try { await call('DELETE', '/api/jobs/' + b.dataset.remove); refresh(); } catch (err) { notice(err.message); }
+});
+$('clear').onclick = async () => { try { await call('DELETE', '/api/jobs'); refresh(); } catch (e) { notice(e.message); } };
+$('zip').onclick = () => { window.location.href = '/api/outputs.zip'; };
+
+async function refresh() {
+  try { state = await call('GET', '/api/state'); render(); }
+  catch (e) { notice('The runner is not reachable. Start it with: python runner/server.py'); }
+}
+
+drawBudget();
+loadLibrary();
+refresh();
+setInterval(refresh, 1000);
+</script>
+</body>
+</html>

@@ -8,6 +8,8 @@ the cost of every step and the measurements behind each decision.
 |---|---|
 | [`solver.cpp`](./solver.cpp) | C++ port of `solution.py` (same greedy, eviction, swap) + exact per-cache re-pack + Large Neighbourhood Search |
 | [`exact.py`](./exact.py) | The whole problem as an integer program, solved by HiGHS (through scipy): proven optimum on small instances, proven upper bound on large ones |
+| [`solve.py`](./solve.py) | One command that picks the methods for a data set, runs them within a time budget and keeps the best valid result |
+| [`runner/`](./runner) | A local web page: drop `.in` files, watch each step, download the `.out` files |
 
 ```bash
 g++ -O2 -std=c++17 -o solver solver.cpp
@@ -17,6 +19,10 @@ solver input.in out.out --repack                 # greedy + exact re-pack
 solver input.in out.out --lns 300                # greedy + re-pack + 5 minutes of LNS
 solver input.in out.out --start best.out --lns 300   # continue from an existing submission
 python exact.py input.in out.out --time-limit 120     # exact solver (small instances)
+solver input.in out.out --lns 600 --time-limit 120   # never runs longer than 120 s
+
+python solve.py input.in out.out --time 300          # everything above, chosen automatically
+python runner/server.py                              # the same in a web page: http://127.0.0.1:8017
 ```
 
 Every stage only keeps a change if the score does not drop, so each one starts from the
@@ -284,7 +290,31 @@ reach and should be double-checked in the sheet.
 
 ---
 
-## 6. Summary
+## 6. Running it on any data set: `solve.py` and the runner
+
+`solve.py` decides which methods to use, so nobody has to remember the rules above:
+
+1. Always run `solver --lns` (greedy, re-pack, LNS) for the whole time budget.
+2. If the exact model is small (at most 50,000 assignment variables), run `exact.py` at the
+   same time. If it proves the optimum, stop everything at once. If it stops at its time limit,
+   improve its solution with LNS for the rest of the budget.
+3. Re-score every candidate with `solution.score()`, check the capacities, keep the best.
+
+The 50,000 threshold comes from the measurements: the exact solver wins on instances with
+under 10,000 variables (zoo 261, regional 2,943, zipF 2,539, big 8,762) and loses on those with
+200,000 or more (videos 210,540, INSTANCED 929,425).
+
+`--time-limit` caps any `solver` run: the first greedy round always completes, so there is
+always a valid answer, and every later step stops on time. On a generated instance near the
+official limits (1,000 caches, 1,000,000 requests) a 120 s limit stopped at 120.2 s; without
+it the re-pack kept making 40 s passes for gains of a few points.
+
+`runner/server.py` serves a page where you drop one or many `.in` files, choose the time per
+data set and how many run at once, and follow each run as a checklist of the steps above
+(greedy round, re-pack pass, LNS, exact solver) with the best score so far. Each `.out` can be
+downloaded, or all of them as a zip with a `scores.csv`.
+
+## 7. Summary
 
 | Stage | Exact? | Changes per step | Can lower the score? | Typical time (kittens) |
 |---|---|---|---|---|
