@@ -16,3 +16,5 @@ ui/tsconfig.tsbuildinfo
 out/
 delivery*/
 delivery*.zip
+solver
+solver.exe

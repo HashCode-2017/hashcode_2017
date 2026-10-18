@@ -8,6 +8,10 @@ A Python 3 solution for the Google Hash Code 2017 qualification-round
 Upload your group's `.out` (and optionally a `.trace`), watch your placement replay, and see
 the leaderboard. How it works and how to host it: [CLASS.md](CLASS.md).
 
+**Stronger pipeline (C++):** greedy → exact per-cache re-pack → Large Neighbourhood Search,
+plus an exact solver for small instances. Step by step, with complexity and results:
+[PIPELINE.md](PIPELINE.md).
+
 ## Requirements
 
 Python 3. The solver uses only the Python standard library.
