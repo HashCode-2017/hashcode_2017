@@ -18,3 +18,5 @@ delivery*/
 delivery*.zip
 solver
 solver.exe
+.playwright-mcp/
+runner/.work/

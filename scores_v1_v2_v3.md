@@ -39,7 +39,7 @@ Percentages in the V2 and V3 columns compare each version with the one before it
 
 **In plain words:** each version kept the previous ideas and added one fix. On our slowest instance, V3 is about 17× slower than V1, for +2.41% more score.
 
-Commands: V1 = `--strategy per-cache --no-swap --no-evict`, V2 = `--strategy per-cache --no-swap`, V3 = default. Outputs are in `out_new/v1/`, `out_new/v2/` and `out_new/`.
+Commands: V1 = `--strategy per-cache --no-swap --no-evict`, V2 = `--strategy per-cache --no-swap`, V3 = default. Run them on the instances to regenerate the outputs.
 
 ### Total score · axis starts at 17.51 M
 
