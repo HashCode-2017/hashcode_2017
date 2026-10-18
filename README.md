@@ -12,12 +12,9 @@ the leaderboard. How it works and how to host it: [CLASS.md](CLASS.md).
 plus an exact solver for small instances. Step by step, with complexity and results:
 [PIPELINE.md](PIPELINE.md).
 
-```bash
-python solve.py input.in output.out --time 300   # best submission for one data set
-python runner/server.py                         # web page: drop .in files, get scores and .out files
-```
-
-Both need `g++` (the solver is compiled on first use), and the exact solver needs `scipy`.
+**Solver runner (local web app):** `python runner/server.py`, then open
+http://127.0.0.1:8017. Drop `.in` files, follow every step of the pipeline live, and download
+the best `.out` for each. See [Solver runner](#solver-runner-local-web-app) below.
 
 ## Requirements
 
@@ -86,6 +83,39 @@ fill (~163 s).
 For a walkthrough of the heuristic and scoring approach, see
 [SOLUTION.md](SOLUTION.md). The original challenge statement is available in
 [hashcode2017_qualification_task.pdf](hashcode2017_qualification_task.pdf).
+
+## Solver runner (local web app)
+
+A small web page to run our best pipeline (see [PIPELINE.md](PIPELINE.md)) on any data set
+without typing commands: drop in one or many `.in` files and download the `.out` files.
+
+```bash
+python runner/server.py                      # then open http://127.0.0.1:8017
+python runner/server.py --port 9000 --parallel 2
+```
+
+1. Choose the **time per data set** (30 s, 2 min, 5 min or 10 min). More time lets the search
+   improve large data sets further; small ones finish as soon as their optimum is proven.
+2. **Drop `.in` files** on the page, use *choose files*, or click one of the data sets in
+   `instances/`. Each one starts right away; *Data sets at the same time* sets how many run
+   together (each uses one or two CPU cores).
+3. Follow each run in the **Status** column, a checklist of the steps: read the file, greedy
+   (current round), re-pack (current pass), LNS, the exact solver for small data sets, and the
+   final score check. The **Score** column shows the best score found so far while it runs.
+4. When a run ends you get its score, how it was obtained (*proven optimum*, or how far it can
+   be at most from the optimum when the exact solver gave a bound) and the time it took.
+   **Download .out** saves one submission; **Download all (.zip)** saves every `.out` plus a
+   `scores.csv` with all the scores.
+
+The page calls `solve.py`, which does the same from the command line:
+
+```bash
+python solve.py input.in output.out --time 300
+```
+
+Requirements: `g++` (the C++ solver is compiled on first use), `fastapi` and `uvicorn` (already
+in `requirements.txt`), and `scipy` for the exact solver. Runs are kept in memory and in
+`runner/.work/` (ignored by git), so the list starts empty each time the server starts.
 
 ## Demo console
 
