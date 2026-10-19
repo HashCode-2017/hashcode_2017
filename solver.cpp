@@ -9,7 +9,8 @@
 // Usage:  solver <input.in> <output.out> [--rounds 5] [--strategy global|per-cache]
 //                [--no-evict] [--no-swap] [--repack] [--candidates 400]
 //                [--kicks N] [--kick-size 3] [--lns SECONDS] [--lns-size 2]
-//                [--seed 1] [--start file.out] [--time-limit SECONDS]
+//                [--seed 1] [--start file.out] [--time-limit SECONDS] [--temp T]
+//                [--moves SECONDS]
 //
 // --time-limit caps the whole run: the first greedy round always completes
 // (so there is a valid answer), every later step stops when time is up, and
@@ -455,6 +456,14 @@ struct Repacker {
             return total;
         }
         int m = items.size();
+        // Same answer on sizes and capacity divided by their gcd, with a much smaller table.
+        int d = 0;
+        for (auto& [v, w, val] : items) if (w <= X) d = __gcd(d, w);
+        if (d > 1) {
+            vector<tuple<int, int, ll>> scaled;
+            for (auto& [v, w, val] : items) if (w <= X) scaled.push_back({v, w / d, val});
+            return knapsack(scaled, X / d, chosen);
+        }
         size_t words = (X + 1 + 63) / 64;
         vector<uint64_t> keep((size_t)m * words, 0);
         vector<ll> dp(X + 1, 0);
@@ -564,7 +573,9 @@ struct Repacker {
 // Destroy: empty k caches that share endpoints (picked by walking cache ->
 // endpoint -> cache). Repair: re-pack just those caches exactly until stable,
 // everyone else fixed. Keep the result if the saving did not drop, else undo.
-static void lns(Repacker& rp, double seconds, int k, int candidates, mt19937_64& rng) {
+// With temp > 0 (score points) a worse result is also kept with probability
+// exp(delta / T), T cooling linearly to 0; the best placement seen is restored at the end.
+static void lns(Repacker& rp, double seconds, int k, int candidates, mt19937_64& rng, double temp) {
     const Inst& in = rp.in;
     Placement& p = rp.p;
     vector<int> caches;
@@ -579,11 +590,15 @@ static void lns(Repacker& rp, double seconds, int k, int candidates, mt19937_64&
     // Running total of the saving, kept up to date from the local deltas, so
     // progress can be reported every couple of seconds without a full re-score.
     ll total = rp.saved();
+    ll bestTotal = total;
+    vector<vector<int>> bestLists;
+    if (temp > 0) bestLists = p.list;
+    uniform_real_distribution<double> unit(0.0, 1.0);
     double lastReport = -2;
     while (chrono::duration<double>(chrono::steady_clock::now() - start).count() < seconds) {
         double t = chrono::duration<double>(chrono::steady_clock::now() - start).count();
         if (t - lastReport >= 2) {
-            fprintf(stderr, "  lns score %lld\n", total * 1000 / in.totalReq);
+            fprintf(stderr, "  lns score %lld\n", max(total, bestTotal) * 1000 / in.totalReq);
             lastReport = t;
         }
         ++iters;
@@ -610,11 +625,101 @@ static void lns(Repacker& rp, double seconds, int k, int candidates, mt19937_64&
         shuffle(order.begin(), order.end(), rng);
         rp.sweepUntilStable(candidates, order, false);
         ll after = local();
-        if (after >= before) { ++kept; better += after > before; total += after - before; }
+        bool accept = after >= before;
+        if (!accept && temp > 0) {
+            double T = temp * (1 - t / seconds);
+            double delta = (double)(after - before) * 1000 / in.totalReq;
+            accept = T > 0 && unit(rng) < exp(delta / T);
+        }
+        if (accept) {
+            ++kept; better += after > before; total += after - before;
+            if (temp > 0 && total > bestTotal) { bestTotal = total; bestLists = p.list; }
+        }
         else for (size_t i = 0; i < group.size(); ++i) rp.setCache(group[i], old[i]);
         for (int e : eps) mark[e] = 0;
     }
+    if (temp > 0 && bestTotal > total)
+        for (int c = 0; c < in.C; ++c) rp.setCache(c, bestLists[c]);
     fprintf(stderr, "  lns: %lld iterations, %lld kept, %lld improving\n", iters, kept, better);
+}
+
+// ---------------------------------------------------------------- swap / replace annealing
+
+// Cheap moves with exact deltas, only the requests of the two videos involved
+// are touched: swap a (in c1) with b (in c2), or replace a in c by b (a = -1:
+// just add b). Partners come from shared endpoints, b from requests seen there.
+// Accept if not worse, or with probability exp(delta / T), T cooling linearly
+// from temp to 0. The best placement seen is restored at the end.
+static void moves(Repacker& rp, double seconds, mt19937_64& rng, double temp) {
+    const Inst& in = rp.in;
+    Placement& p = rp.p;
+    vector<int> caches;
+    for (int c = 0; c < in.C; ++c) if (!in.cacheEps[c].empty()) caches.push_back(c);
+    if (caches.empty()) return;
+    auto rnd = [&](size_t n) { return (size_t)(rng() % n); };
+    uniform_real_distribution<double> unit(0.0, 1.0);
+    auto vsave = [&](int v) {
+        ll s = 0;
+        for (int r : in.vidReq[v]) s += in.rN[r] * (in.LD[in.rE[r]] - rp.b1[r]);
+        return s;
+    };
+
+    seconds = min(seconds, secondsLeft());
+    auto start = chrono::steady_clock::now();
+    ll total = rp.saved(), bestTotal = total;
+    bool atBest = true;
+    vector<vector<int>> bestLists;
+    long long iters = 0, kept = 0, better = 0;
+    double t = 0, lastReport = -2;
+    while (t < seconds) {
+        if ((++iters & 255) == 0) {
+            t = chrono::duration<double>(chrono::steady_clock::now() - start).count();
+            if (t - lastReport >= 2) { fprintf(stderr, "  moves score %lld\n", bestTotal * 1000 / in.totalReq); lastReport = t; }
+        }
+        int c1 = caches[rnd(caches.size())];
+        int e = in.cacheEps[c1][rnd(in.cacheEps[c1].size())].first;
+        int a = p.list[c1].empty() ? -1 : p.list[c1][rnd(p.list[c1].size())];
+        int c2 = -1, b;
+        if (a >= 0 && rng() % 2) {          // swap with a video of a neighbouring cache
+            c2 = in.epCaches[e][rnd(in.epCaches[e].size())].first;
+            if (c2 == c1 || p.list[c2].empty()) continue;
+            b = p.list[c2][rnd(p.list[c2].size())];
+            if (b == a || p.has(c2, a) || p.has(c1, b)) continue;
+            if (p.rem[c1] + in.size[a] < in.size[b] || p.rem[c2] + in.size[b] < in.size[a]) continue;
+        } else {                            // replace a (or add) by a video requested nearby
+            if (in.epReq[e].empty()) continue;
+            b = in.rV[in.epReq[e][rnd(in.epReq[e].size())]];
+            if (p.has(c1, b)) continue;
+            if (a >= 0 && p.rem[c1] >= in.size[b]) a = -1;   // fits without removing anything
+            if (p.rem[c1] + (a >= 0 ? in.size[a] : 0) < in.size[b]) continue;
+        }
+        auto apply = [&]() {
+            if (a >= 0) rp.delV(c1, a);
+            if (c2 >= 0) { rp.delV(c2, b); rp.addV(c2, a); }
+            rp.addV(c1, b);
+        };
+        auto undo = [&]() {
+            rp.delV(c1, b);
+            if (c2 >= 0) { rp.delV(c2, a); rp.addV(c2, b); }
+            if (a >= 0) rp.addV(c1, a);
+        };
+        ll before = (a >= 0 ? vsave(a) : 0) + vsave(b);
+        apply();
+        ll delta = (a >= 0 ? vsave(a) : 0) + vsave(b) - before;
+        bool accept = delta >= 0;
+        if (!accept && temp > 0) {
+            double T = temp * (1 - t / seconds);
+            accept = T > 0 && unit(rng) < exp((double)delta * 1000 / in.totalReq / T);
+            if (accept && atBest) { undo(); bestLists = p.list; apply(); }   // leaving the best: save it
+        }
+        if (!accept) { undo(); continue; }
+        ++kept; better += delta > 0; total += delta;
+        if (total > bestTotal) { bestTotal = total; atBest = true; }
+        else if (delta < 0) atBest = false;
+    }
+    if (!atBest)
+        for (int c = 0; c < in.C; ++c) rp.setCache(c, bestLists[c]);
+    fprintf(stderr, "  moves: %lld iterations, %lld kept, %lld improving\n", iters, kept, better);
 }
 
 // ---------------------------------------------------------------- main
@@ -630,7 +735,7 @@ int main(int argc, char** argv) {
     unsigned seed = 1;
     bool global = true, evict = true, swap = true, repack = false;
     const char* start = nullptr;
-    double lnsSeconds = 0, timeLimit = 0;
+    double lnsSeconds = 0, timeLimit = 0, temp = 0, movesSeconds = 0;
     int lnsSize = 2;
     for (int i = 3; i < argc; ++i) {
         string a = argv[i];
@@ -647,6 +752,8 @@ int main(int argc, char** argv) {
         else if (a == "--start") start = val();
         else if (a == "--lns") { lnsSeconds = atof(val()); repack = true; }
         else if (a == "--lns-size") lnsSize = atoi(val());
+        else if (a == "--temp") temp = atof(val());
+        else if (a == "--moves") { movesSeconds = atof(val()); repack = true; }
         else if (a == "--time-limit") timeLimit = atof(val());
         else { fprintf(stderr, "unknown option %s\n", a.c_str()); return 1; }
     }
@@ -704,7 +811,8 @@ int main(int argc, char** argv) {
             fprintf(stderr, "%s + re-pack: %lld (%.1fs)\n", what, s, secs());
             if (s > best) { best = s; writeOut(outPath, in, p); }
         };
-        if (lnsSeconds > 0) { lns(rp, lnsSeconds, lnsSize, candidates, rng64); finish("lns"); }
+        if (lnsSeconds > 0) { lns(rp, lnsSeconds, lnsSize, candidates, rng64, temp); finish("lns"); }
+        if (movesSeconds > 0) { moves(rp, movesSeconds, rng64, temp); finish("moves"); }
     }
     fprintf(stderr, "final %lld (%.1fs)\n", scoreOf(in, p), secs());
     return 0;
