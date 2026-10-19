@@ -81,7 +81,8 @@
   .stepper button { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--rule); background: transparent; font-size: 18px; line-height: 1; }
   .stepper output { min-width: 2ch; text-align: center; font-weight: 600; font-size: 17px; }
 
-  .library { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--slate); font-size: 14px; }
+  .library { margin-top: 14px; display: grid; gap: 10px; color: var(--slate); font-size: 14px; }
+  .lib-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .library button {
     border: 1px solid var(--rule); background: var(--panel); border-radius: 999px; padding: 4px 12px; font-size: 14px;
   }
@@ -194,9 +195,9 @@
   <section class="intake" aria-label="Add data sets">
     <div>
       <label class="drop" id="drop">
-        <input type="file" id="files" accept=".in" multiple aria-label="Choose .in files">
+        <input type="file" id="files" accept=".in,.txt" multiple aria-label="Choose .in or .txt files">
         <div>
-          <strong>Drop .in files here</strong>
+          <strong>Drop .in or .txt files here</strong>
           <span>or <span class="pick">choose files</span>. They start as soon as they are added.</span>
         </div>
       </label>
@@ -228,7 +229,8 @@
       <h2>Results</h2>
       <div class="actions">
         <button class="btn" id="clear" type="button">Clear finished</button>
-        <button class="btn primary" id="zip" type="button">Download all (.zip)</button>
+        <button class="btn" id="zip" type="button">Download all (.zip)</button>
+        <button class="btn primary" id="submission" type="button" title="Folder &laquo;soumission de la team D&raquo;, files named instance_01_D.txt">Download submission (instances_D.zip)</button>
       </div>
     </div>
     <table>
@@ -296,9 +298,9 @@ $('par-up').onclick = () => setParallel(state.parallel + 1);
 
 // ---- adding files
 async function addFiles(list) {
-  const files = [...list].filter((f) => f.name.endsWith('.in'));
+  const files = [...list].filter((f) => /\.(in|txt)$/i.test(f.name));
   const skipped = list.length - files.length;
-  notice(skipped ? `${skipped} file${skipped > 1 ? 's were' : ' was'} skipped: only .in files can be solved.` : '');
+  notice(skipped ? `${skipped} file${skipped > 1 ? 's were' : ' was'} skipped: only .in and .txt files can be solved.` : '');
   for (const f of files) {
     try { await call('POST', `/api/jobs?name=${encodeURIComponent(f.name)}&budget=${budget}`, f); }
     catch (e) { notice(e.message); }
@@ -316,15 +318,20 @@ async function loadLibrary() {
     const files = await call('GET', '/api/library');
     if (!files.length) return;
     const lib = $('library');
-    lib.innerHTML = 'From this repo:' + files.map((f) =>
-      `<button type="button" data-name="${esc(f.name)}">${esc(f.name.replace(/\.in$/, ''))}</button>`).join('') +
-      `<button type="button" data-all="1">all ${files.length}</button>`;
+    const groups = [...new Set(files.map((f) => f.group))];
+    lib.innerHTML = groups.map((g) => {
+      const own = files.filter((f) => f.group === g);
+      return `<div class="lib-row">${esc(g)}:` + own.map((f) =>
+        `<button type="button" data-group="${esc(g)}" data-name="${esc(f.name)}">${esc(f.name.replace(/\.(in|txt)$/i, ''))}</button>`).join('') +
+        `<button type="button" data-group="${esc(g)}" data-all="1">all ${own.length}</button></div>`;
+    }).join('');
     lib.hidden = false;
     lib.addEventListener('click', async (e) => {
       const b = e.target.closest('button'); if (!b) return;
-      const names = b.dataset.all ? files.map((f) => f.name) : [b.dataset.name];
+      const g = b.dataset.group;
+      const names = b.dataset.all ? files.filter((f) => f.group === g).map((f) => f.name) : [b.dataset.name];
       for (const n of names) {
-        try { await call('POST', `/api/library/${encodeURIComponent(n)}?budget=${budget}`); }
+        try { await call('POST', `/api/library/${encodeURIComponent(n)}?budget=${budget}&group=${encodeURIComponent(g)}`); }
         catch (err) { notice(err.message); }
       }
       refresh();
@@ -393,7 +400,7 @@ function render() {
   const jobs = state.jobs;
   $('par').textContent = state.parallel;
   $('rows').innerHTML = jobs.length ? jobs.map(row).join('')
-    : `<tr><td colspan="6" class="empty">No runs yet. Drop .in files above, or pick a data set from this repo.</td></tr>`;
+    : `<tr><td colspan="6" class="empty">No runs yet. Drop .in or .txt files above, or pick a data set from this repo.</td></tr>`;
   const done = jobs.filter((j) => j.status === 'done');
   const active = jobs.filter((j) => j.status === 'queued' || j.status === 'running').length;
   $('foot').innerHTML = done.length ? `<tr>
@@ -401,7 +408,7 @@ function render() {
       <td>${active ? `${active} still running or waiting` : ''}</td>
       <td class="num"><span class="score">${fmt(done.reduce((a, j) => a + j.result.score, 0))}</span></td>
       <td class="col-how"></td><td class="col-time"></td><td></td></tr>` : '';
-  $('zip').disabled = !done.length;
+  $('zip').disabled = $('submission').disabled = !done.length;
   $('clear').disabled = !jobs.some((j) => j.status === 'done' || j.status === 'error');
 }
 
@@ -411,6 +418,7 @@ $('rows').addEventListener('click', async (e) => {
 });
 $('clear').onclick = async () => { try { await call('DELETE', '/api/jobs'); refresh(); } catch (e) { notice(e.message); } };
 $('zip').onclick = () => { window.location.href = '/api/outputs.zip'; };
+$('submission').onclick = () => { window.location.href = '/api/submission.zip?team=D'; };
 
 async function refresh() {
   try { state = await call('GET', '/api/state'); render(); }

@@ -2,7 +2,7 @@
 """
 Local web runner for the solving pipeline (solve.py).
 
-Drop one or many .in files in the page, pick a time budget, and every file
+Drop one or many .in or .txt files in the page, pick a time budget, and every file
 goes through solve.solve(): greedy -> re-pack -> LNS, plus the exact solver on
 small data sets. Results (score, method, proven bound, time) appear as they
 finish, and each .out can be downloaded, or all of them as one zip.
@@ -32,7 +32,10 @@ import solve  # noqa: E402  (needs ROOT on the path)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, ".work")
-LIBRARY = [os.path.join(ROOT, "instances")]      # folders offered as one-click picks
+# folders offered as one-click picks, shown as one row each
+LIBRARY = [("instances", os.path.join(ROOT, "instances")),
+           ("local_contest_instances", os.path.join(ROOT, "local_contest_instances", "instances"))]
+EXTENSIONS = (".in", ".txt")                     # same file format under either name
 
 app = FastAPI()
 lock = threading.Lock()
@@ -43,7 +46,7 @@ settings = {"parallel": 4}
 def _safe_name(name):
     base = os.path.basename(name or "instance.in")
     base = re.sub(r"[^A-Za-z0-9._ ()-]", "_", base)
-    return base if base.endswith(".in") else base + ".in"
+    return base if base.endswith(EXTENSIONS) else base + ".in"
 
 
 def _public(job):
@@ -61,7 +64,7 @@ def _new_job(name, data, budget):
     job = {"id": jid, "name": _safe_name(name), "bytes": len(data), "budget": budget,
            "status": "queued", "phase": "waiting", "queued": time.time(), "started": None,
            "finished": None, "result": None, "error": None, "progress": None,
-           "input": path, "output": path[:-3] + ".out"}
+           "input": path, "output": os.path.splitext(path)[0] + ".out"}
     with lock:
         jobs[jid] = job
     return job
@@ -126,18 +129,22 @@ async def add_job(request: Request, name: str, budget: float = 300):
 
 @app.get("/api/library")
 def library():
-    files = []
-    for folder in LIBRARY:
+    files, seen = [], set()
+    for group, folder in LIBRARY:
         if os.path.isdir(folder):
             for f in sorted(os.listdir(folder)):
-                if f.endswith(".in"):
-                    files.append({"name": f, "bytes": os.path.getsize(os.path.join(folder, f))})
+                if f.endswith(EXTENSIONS) and f not in seen:     # a copy in two folders shows once
+                    seen.add(f)
+                    files.append({"name": f, "group": group,
+                                  "bytes": os.path.getsize(os.path.join(folder, f))})
     return files
 
 
 @app.post("/api/library/{name}")
-def add_from_library(name: str, budget: float = 300):
-    for folder in LIBRARY:
+def add_from_library(name: str, budget: float = 300, group: str = ""):
+    for g, folder in LIBRARY:
+        if group and g != group:
+            continue
         path = os.path.join(folder, os.path.basename(name))
         if os.path.isfile(path):
             with open(path, "rb") as f:
@@ -172,7 +179,7 @@ def clear_finished():
 
 
 def _out_name(job):
-    return job["name"][:-3] + ".out"
+    return os.path.splitext(job["name"])[0] + ".out"
 
 
 @app.get("/api/jobs/{jid}/out")
@@ -203,6 +210,38 @@ def download_all():
         z.writestr("scores.csv", "\n".join(lines) + "\n")
     return Response(buf.getvalue(), media_type="application/zip",
                     headers={"Content-Disposition": 'attachment; filename="outputs.zip"'})
+
+
+TEAM = "D"
+
+
+def _submission_name(job, team):
+    """instance01.txt -> instance_01_D.txt; names without a number -> kittens_D.txt."""
+    stem = os.path.splitext(job["name"])[0]
+    m = re.match(r"^(.*?)_?(\d+)$", stem)
+    base = f"{m.group(1)}_{m.group(2)}" if m and m.group(1) else stem
+    return f"{base}_{team}.txt"
+
+
+@app.get("/api/submission.zip")
+def download_submission(team: str = TEAM):
+    """Every finished .out, renamed for the class submission, in one folder of a zip."""
+    team = re.sub(r"[^A-Za-z0-9]", "", team) or TEAM
+    done = [j for j in jobs.values() if j["status"] == "done"]
+    if not done:
+        raise HTTPException(404, "no finished runs yet")
+    folder = f"soumission de la team {team}"
+    buf = io.BytesIO()
+    best = {}                                 # one file per data set: the best run wins
+    for j in done:
+        name = _submission_name(j, team)
+        if name not in best or j["result"]["score"] > best[name]["result"]["score"]:
+            best[name] = j
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for name in sorted(best):
+            z.write(best[name]["output"], f"{folder}/{name}")
+    return Response(buf.getvalue(), media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="instances_{team}.zip"'})
 
 
 def main():
