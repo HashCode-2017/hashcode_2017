@@ -17,6 +17,8 @@ a few hundred thousand.
 
 Usage:
     python solve.py <input.in> <output.out> [--time 300] [--exact-max 50000]
+                    [--exact-share 0.5] [--lns-size 2] [--candidates 400]
+                    [--rounds 5] [--seed 1]
 
 solve() is also what the runner UI (runner/) calls.
 """
@@ -35,6 +37,21 @@ from solution import parse_input, score
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BINARY = os.path.join(HERE, "solver.exe" if os.name == "nt" else "solver")
+
+# Tunable settings and their defaults; the runner UI exposes the same names.
+DEFAULTS = {
+    "exact_max": 50000,   # largest model (assignment variables) given to the exact solver
+    "exact_share": 0.5,   # part of the budget the exact solver may use before LNS polishes it
+    "lns_size": 2,        # caches emptied and rebuilt at each LNS step
+    "candidates": 400,    # videos each cache's knapsack considers
+    "rounds": 5,          # greedy rounds
+    "seed": 1,            # LNS random seed: another seed explores another path
+}
+
+
+def solver_flags(p):
+    return ["--lns-size", str(p["lns_size"]), "--candidates", str(p["candidates"]),
+            "--rounds", str(p["rounds"]), "--seed", str(p["seed"])]
 
 
 def build_solver():
@@ -144,8 +161,16 @@ def _follow_solver(proc, prog, greedy, repack, lns):
             prog.set(lns, "done", "", int(m[1]))
 
 
-def solve(input_path, output_path, time_budget=300.0, exact_max=50000, log=None, on_progress=None):
-    """Run the pipeline on one data set. Returns a dict describing the result."""
+def solve(input_path, output_path, time_budget=300.0, exact_max=None, log=None, on_progress=None,
+          params=None):
+    """Run the pipeline on one data set. Returns a dict describing the result.
+
+    params overrides any of DEFAULTS; exact_max is kept as a shortcut for it.
+    """
+    p = dict(DEFAULTS, **(params or {}))
+    if exact_max is not None:
+        p["exact_max"] = exact_max
+    exact_max = p["exact_max"]
     say = log or (lambda msg: print(msg, file=sys.stderr))
     prog = Progress(on_progress, say)
     t0 = time.time()
@@ -156,7 +181,7 @@ def solve(input_path, output_path, time_budget=300.0, exact_max=50000, log=None,
     size = assignment_vars(inst)
     use_exact = size <= exact_max
     info = {"V": inst.V, "E": inst.E, "R": inst.R, "C": inst.C, "X": inst.X,
-            "variables": size, "exact": use_exact, "bound": None, "candidates": {}}
+            "variables": size, "exact": use_exact, "bound": None, "candidates": {}, "params": p}
     for key, label in [("greedy", "Greedy"), ("repack", "Re-pack"), ("lns", "LNS")]:
         prog.add(key, label)
     if use_exact:
@@ -169,7 +194,7 @@ def solve(input_path, output_path, time_budget=300.0, exact_max=50000, log=None,
         budget = max(5.0, time_budget - (time.time() - t0))
         lns_out = os.path.join(tmp, "lns.out")
         main_run = subprocess.Popen(
-            [BINARY, input_path, lns_out, "--lns", str(budget), "--time-limit", str(budget)],
+            [BINARY, input_path, lns_out, "--lns", str(budget), "--time-limit", str(budget)] + solver_flags(p),
             stderr=subprocess.PIPE, text=True)
         runs = {"greedy + re-pack + LNS": main_run}
         outputs = {"greedy + re-pack + LNS": lns_out}
@@ -181,7 +206,7 @@ def solve(input_path, output_path, time_budget=300.0, exact_max=50000, log=None,
             prog.set("exact", "active")
             exact_out = os.path.join(tmp, "exact.out")
             r = subprocess.run([sys.executable, os.path.join(HERE, "exact.py"), input_path, exact_out,
-                                "--time-limit", str(max(2.0, budget * 0.5))],
+                                "--time-limit", str(max(2.0, budget * p["exact_share"]))],
                                capture_output=True, text=True)
             m = re.search(r"upper bound ([\d,]+)", r.stderr)
             if m:
@@ -205,7 +230,7 @@ def solve(input_path, output_path, time_budget=300.0, exact_max=50000, log=None,
                     polished = os.path.join(tmp, "exact_lns.out")
                     polish = subprocess.Popen(
                         [BINARY, input_path, polished, "--start", exact_out, "--lns", str(rest),
-                         "--time-limit", str(rest)], stderr=subprocess.PIPE, text=True)
+                         "--time-limit", str(rest)] + solver_flags(p), stderr=subprocess.PIPE, text=True)
                     runs["exact + LNS"] = polish
                     outputs["exact + LNS"] = polished
                     t = threading.Thread(target=_follow_solver, args=(polish, prog, None, "polish", "polish"),
@@ -245,11 +270,17 @@ def main():
     ap.add_argument("input")
     ap.add_argument("output")
     ap.add_argument("--time", type=float, default=300, help="wall-clock budget in seconds")
-    ap.add_argument("--exact-max", type=int, default=50000,
+    ap.add_argument("--exact-max", type=int, default=DEFAULTS["exact_max"],
                     help="largest model (assignment variables) given to the exact solver")
+    ap.add_argument("--exact-share", type=float, default=DEFAULTS["exact_share"],
+                    help="part of the budget the exact solver may use")
+    ap.add_argument("--lns-size", type=int, default=DEFAULTS["lns_size"], help="caches rebuilt per LNS step")
+    ap.add_argument("--candidates", type=int, default=DEFAULTS["candidates"], help="videos per cache knapsack")
+    ap.add_argument("--rounds", type=int, default=DEFAULTS["rounds"], help="greedy rounds")
+    ap.add_argument("--seed", type=int, default=DEFAULTS["seed"], help="LNS random seed")
     a = ap.parse_args()
 
-    r = solve(a.input, a.output, a.time, a.exact_max)
+    r = solve(a.input, a.output, a.time, params={k: getattr(a, k) for k in DEFAULTS})
     print(f"{a.input}: V={r['V']} E={r['E']} R={r['R']} C={r['C']} X={r['X']}, "
           f"{r['variables']:,} assignment variables, exact solver {'on' if r['exact'] else 'off'}",
           file=sys.stderr)

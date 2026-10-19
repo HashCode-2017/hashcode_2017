@@ -81,6 +81,21 @@
   .stepper button { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--rule); background: transparent; font-size: 18px; line-height: 1; }
   .stepper output { min-width: 2ch; text-align: center; font-weight: 600; font-size: 17px; }
 
+  .custom { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 14px; color: var(--slate); }
+  .settings input[type=number] {
+    width: 100%; padding: 6px 9px; border: 1px solid var(--rule); border-radius: 8px;
+    background: var(--paper); color: var(--ink); font: inherit; font-variant-numeric: tabular-nums;
+  }
+  .custom input[type=number] { width: 96px; }
+  .custom input.on { border-color: var(--ink); }
+  .adv { border-top: 1px solid var(--rule); margin-top: 16px; padding-top: 12px; }
+  .adv summary { cursor: pointer; font-weight: 600; font-size: 15px; }
+  .adv summary .changed { font-weight: 500; color: var(--amber); font-size: 13px; margin-left: 6px; }
+  .adv .grid { display: grid; gap: 12px; margin-top: 12px; }
+  .adv label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+  .adv .hint { margin-top: 4px; }
+  .adv .reset { margin-top: 12px; }
+  .params { display: block; color: var(--amber); font-size: 12.5px; font-weight: 500; }
   .library { margin-top: 14px; display: grid; gap: 10px; color: var(--slate); font-size: 14px; }
   .lib-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .library button {
@@ -142,7 +157,8 @@
   .tag.opt { background: var(--green-soft); color: var(--green); }
   .tag.gap { background: var(--amber-soft); color: var(--ink); }
   .method { display: block; margin-top: 4px; color: var(--slate); font-size: 13px; }
-  .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+  .row-actions { display: flex; flex-wrap: wrap; gap: 2px 6px; justify-content: flex-end; }
+  .row-actions .link { white-space: nowrap; }
   .link { background: none; border: 0; padding: 4px 6px; font-weight: 600; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
   .link.quiet { color: var(--slate); font-weight: 500; }
 
@@ -208,6 +224,7 @@
       <div class="field">
         <h2 id="budget-label">Time per data set</h2>
         <div class="seg" role="group" aria-labelledby="budget-label" id="budget"></div>
+        <label class="custom">or exactly <input type="number" id="budget-s" min="5" step="10" aria-label="Time per data set in seconds"> seconds</label>
         <p class="hint">More time lets the search improve large data sets further. Small ones finish early.</p>
       </div>
       <div class="field">
@@ -219,6 +236,12 @@
         </div>
         <p class="hint">Each run uses one or two CPU cores.</p>
       </div>
+      <details class="adv" id="adv">
+        <summary>Algorithm settings<span class="changed" id="adv-changed"></span></summary>
+        <div class="grid" id="adv-fields"></div>
+        <button class="btn reset" type="button" id="adv-reset">Reset to defaults</button>
+        <p class="hint">New runs use these settings. Settings that differ from the defaults show under each run.</p>
+      </details>
     </div>
   </section>
 
@@ -251,10 +274,11 @@
 </main>
 
 <script>
-const BUDGETS = [[30, '30 s'], [120, '2 min'], [300, '5 min'], [600, '10 min']];
+const BUDGETS = [[30, '30 s'], [120, '2 min'], [300, '5 min'], [600, '10 min'], [1200, '20 min']];
 let budget = 120;
 try { budget = Number(localStorage.getItem('budget')) || budget; } catch (e) {}
 let state = { jobs: [], parallel: 4, now: Date.now() / 1000 };
+
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => n.toLocaleString('en-US');
@@ -278,11 +302,78 @@ async function call(method, url, body) {
   return r.json();
 }
 
+// Algorithm settings: same names as solve.DEFAULTS. pct shows a 0-1 share as a percentage.
+const FIELDS = [
+  { key: 'seed', label: 'Random seed', step: 1,
+    hint: 'Another seed takes another search path. Run a data set again with a few seeds: the submission zip keeps the best.' },
+  { key: 'lns_size', label: 'LNS neighbourhood (caches)', step: 1, min: 1, max: 20,
+    hint: 'Caches emptied and rebuilt together at each search step.' },
+  { key: 'exact_max', label: 'Exact solver up to (variables)', step: 10000, min: 0,
+    hint: 'Bigger data sets run greedy and LNS only. 300,000 also covers instances 11, 12 and 14.' },
+  { key: 'exact_share', label: 'Exact solver time (%)', step: 5, min: 5, max: 95, pct: true,
+    hint: 'Part of the time the exact solver gets; LNS then improves its result.' },
+  { key: 'candidates', label: 'Re-pack candidates per cache', step: 50, min: 20, max: 5000,
+    hint: 'Videos each cache considers when it is re-packed exactly.' },
+  { key: 'rounds', label: 'Greedy rounds', step: 1, min: 1, max: 50, hint: 'Fill, evict and swap passes of the first solution.' },
+];
+let defaults = null;      // from the server
+let params = {};          // only the settings changed from the defaults
+try { params = JSON.parse(localStorage.getItem('params') || '{}') || {}; } catch (e) {}
+
+function qs() {
+  const q = new URLSearchParams({ budget });
+  for (const [k, v] of Object.entries(params)) q.set(k, v);
+  return q.toString();
+}
+const shown = (f, v) => f.pct ? Math.round(v * 100) : v;
+function describe(p) {
+  if (!p || !defaults) return '';
+  return FIELDS.filter((f) => p[f.key] !== defaults[f.key])
+    .map((f) => `${f.label.replace(/ \(.*\)$/, '').replace(/^[A-Z](?=[a-z])/, (c) => c.toLowerCase())} ${f.pct ? shown(f, p[f.key]) + '%' : fmt(p[f.key])}`).join(', ');
+}
+function drawFields() {
+  if (!defaults) return;
+  $('adv-fields').innerHTML = FIELDS.map((f) => {
+    const v = f.key in params ? params[f.key] : defaults[f.key];
+    return `<div><label for="p-${f.key}">${esc(f.label)}</label>
+      <input type="number" id="p-${f.key}" data-key="${f.key}" step="${f.step}"${f.min != null ? ` min="${f.min}"` : ''}${f.max != null ? ` max="${f.max}"` : ''} value="${shown(f, v)}">
+      <p class="hint">${esc(f.hint)} Default ${f.pct ? shown(f, defaults[f.key]) + '%' : fmt(defaults[f.key])}.</p></div>`;
+  }).join('');
+  const n = Object.keys(params).length;
+  $('adv-changed').textContent = n ? `${n} changed` : '';
+}
+function saveParams() { try { localStorage.setItem('params', JSON.stringify(params)); } catch (e) {} }
+$('adv-fields').addEventListener('change', (e) => {
+  const inp = e.target.closest('input'); if (!inp) return;
+  const f = FIELDS.find((x) => x.key === inp.dataset.key);
+  let v = Number(inp.value);
+  if (inp.value === '' || !Number.isFinite(v)) { delete params[f.key]; }
+  else {
+    if (f.min != null) v = Math.max(f.min, v);
+    if (f.max != null) v = Math.min(f.max, v);
+    v = f.pct ? v / 100 : Math.round(v);
+    if (v === defaults[f.key]) delete params[f.key]; else params[f.key] = v;
+  }
+  saveParams(); drawFields();
+});
+$('adv-reset').onclick = () => { params = {}; saveParams(); drawFields(); };
+
 // ---- settings
 function drawBudget() {
   $('budget').innerHTML = BUDGETS.map(([s, label]) =>
     `<button type="button" data-s="${s}" aria-pressed="${s === budget}">${label}</button>`).join('');
+  const inp = $('budget-s');
+  if (document.activeElement !== inp) inp.value = budget;
+  inp.classList.toggle('on', !BUDGETS.some(([s]) => s === budget));
 }
+$('budget-s').addEventListener('change', (e) => {
+  const v = Math.round(Number(e.target.value));
+  if (!Number.isFinite(v) || v <= 0) { drawBudget(); return; }
+  budget = Math.max(5, Math.min(v, state.max_budget || 7200));
+  try { localStorage.setItem('budget', budget); } catch (err) {}
+  e.target.value = budget;
+  drawBudget();
+});
 $('budget').addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;
   budget = Number(b.dataset.s);
@@ -302,7 +393,7 @@ async function addFiles(list) {
   const skipped = list.length - files.length;
   notice(skipped ? `${skipped} file${skipped > 1 ? 's were' : ' was'} skipped: only .in and .txt files can be solved.` : '');
   for (const f of files) {
-    try { await call('POST', `/api/jobs?name=${encodeURIComponent(f.name)}&budget=${budget}`, f); }
+    try { await call('POST', `/api/jobs?name=${encodeURIComponent(f.name)}&${qs()}`, f); }
     catch (e) { notice(e.message); }
   }
   refresh();
@@ -331,7 +422,7 @@ async function loadLibrary() {
       const g = b.dataset.group;
       const names = b.dataset.all ? files.filter((f) => f.group === g).map((f) => f.name) : [b.dataset.name];
       for (const n of names) {
-        try { await call('POST', `/api/library/${encodeURIComponent(n)}?budget=${budget}&group=${encodeURIComponent(g)}`); }
+        try { await call('POST', `/api/library/${encodeURIComponent(n)}?${qs()}&group=${encodeURIComponent(g)}`); }
         catch (err) { notice(err.message); }
       }
       refresh();
@@ -354,6 +445,7 @@ function row(j) {
   const r = j.result;
   const best = j.progress ? j.progress.best : null;
   const dims = r ? `${fmt(r.V)} videos, ${fmt(r.C)} caches, ${fmt(r.R)} requests` : size(j.bytes);
+  const changed = describe(j.params);
   let status, phase = '';
   if (j.status === 'queued') { status = 'Waiting'; phase = 'starts when a slot frees up'; }
   else if (j.status === 'running') { status = 'Solving'; }
@@ -379,13 +471,14 @@ function row(j) {
     bar = `<div class="budget" style="width:${Math.min(100, el / j.budget * 100).toFixed(1)}%"></div>`;
   } else if (r) time = dur(r.seconds);
 
+  const again = `<button class="link quiet" type="button" data-rerun="${j.id}" title="Solve it again with the settings chosen above">Run again</button>`;
+  const remove = `<button class="link quiet" type="button" data-remove="${j.id}">Remove</button>`;
   const actions = j.status === 'done'
-    ? `<a class="link" href="/api/jobs/${j.id}/out" download>Download .out</a>
-       <button class="link quiet" type="button" data-remove="${j.id}">Remove</button>`
-    : j.status === 'running' ? '' : `<button class="link quiet" type="button" data-remove="${j.id}">Remove</button>`;
+    ? `<a class="link" href="/api/jobs/${j.id}/out" download>Download .out</a>${again}${remove}`
+    : j.status === 'running' ? '' : j.status === 'error' ? again + remove : remove;
 
   return `<tr class="${j.status === 'error' ? 'error' : j.status}">
-    <td><span class="name">${esc(j.name)}</span><span class="dims" style="display:block">${dims}</span></td>
+    <td><span class="name">${esc(j.name)}</span><span class="dims" style="display:block">${dims}</span>${changed ? `<span class="params">${esc(changed)}</span>` : ''}</td>
     <td><span class="status"><span class="dot" aria-hidden="true"></span>${status}</span>${phase ? `<span class="phase">${esc(phase)}</span>` : ''}${steps(j)}</td>
     <td class="num">${r ? `<span class="score">${fmt(r.score)}</span>`
       : best != null ? `<span class="score muted">${fmt(best)}</span><span class="live">best so far</span>`
@@ -413,6 +506,11 @@ function render() {
 }
 
 $('rows').addEventListener('click', async (e) => {
+  const again = e.target.closest('[data-rerun]');
+  if (again) {
+    try { await call('POST', `/api/jobs/${again.dataset.rerun}/rerun?${qs()}`); refresh(); } catch (err) { notice(err.message); }
+    return;
+  }
   const b = e.target.closest('[data-remove]'); if (!b) return;
   try { await call('DELETE', '/api/jobs/' + b.dataset.remove); refresh(); } catch (err) { notice(err.message); }
 });
@@ -421,7 +519,11 @@ $('zip').onclick = () => { window.location.href = '/api/outputs.zip'; };
 $('submission').onclick = () => { window.location.href = '/api/submission.zip?team=D'; };
 
 async function refresh() {
-  try { state = await call('GET', '/api/state'); render(); }
+  try {
+    state = await call('GET', '/api/state');
+    if (!defaults) { defaults = state.defaults; drawFields(); }
+    render();
+  }
   catch (e) { notice('The runner is not reachable. Start it with: python runner/server.py'); }
 }
 

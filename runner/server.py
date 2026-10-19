@@ -50,11 +50,35 @@ def _safe_name(name):
 
 
 def _public(job):
-    return {k: job[k] for k in ("id", "name", "bytes", "budget", "status", "phase",
+    return {k: job[k] for k in ("id", "name", "bytes", "budget", "params", "status", "phase",
                                 "queued", "started", "finished", "result", "error", "progress")}
 
 
-def _new_job(name, data, budget):
+MAX_BUDGET = 7200.0
+# setting -> (type, lowest, highest) accepted from the page
+LIMITS = {"exact_max": (int, 0, 5_000_000), "exact_share": (float, 0.05, 0.95),
+          "lns_size": (int, 1, 20), "candidates": (int, 20, 5000),
+          "rounds": (int, 1, 50), "seed": (int, 0, 2**31 - 1)}
+
+
+def _budget(value):
+    return max(5.0, min(float(value), MAX_BUDGET))
+
+
+def _params(request):
+    """The algorithm settings sent as query parameters, clamped; missing ones use the defaults."""
+    p = dict(solve.DEFAULTS)
+    for key, (kind, lo, hi) in LIMITS.items():
+        raw = request.query_params.get(key)
+        if raw not in (None, ""):
+            try:
+                p[key] = kind(max(lo, min(kind(float(raw)), hi)))
+            except ValueError:
+                raise HTTPException(400, f"{key} must be a number")
+    return p
+
+
+def _new_job(name, data, budget, params=None):
     jid = uuid.uuid4().hex[:10]
     folder = os.path.join(WORK, jid)
     os.makedirs(folder)
@@ -62,6 +86,7 @@ def _new_job(name, data, budget):
     with open(path, "wb") as f:
         f.write(data)
     job = {"id": jid, "name": _safe_name(name), "bytes": len(data), "budget": budget,
+           "params": params or dict(solve.DEFAULTS),
            "status": "queued", "phase": "waiting", "queued": time.time(), "started": None,
            "finished": None, "result": None, "error": None, "progress": None,
            "input": path, "output": os.path.splitext(path)[0] + ".out"}
@@ -77,7 +102,7 @@ def _run(job):
         def progress(snap):
             job["progress"] = snap
         job["result"] = solve.solve(job["input"], job["output"], job["budget"], log=log,
-                                    on_progress=progress)
+                                    on_progress=progress, params=job["params"])
         job["status"] = "done"
         job["phase"] = "done"
     except Exception as e:                       # shown in the page, never fatal
@@ -113,7 +138,7 @@ def index():
 def state():
     with lock:
         return {"jobs": [_public(j) for j in jobs.values()], "parallel": settings["parallel"],
-                "now": time.time()}
+                "defaults": solve.DEFAULTS, "max_budget": MAX_BUDGET, "now": time.time()}
 
 
 @app.post("/api/jobs")
@@ -124,7 +149,17 @@ async def add_job(request: Request, name: str, budget: float = 300):
     head = data[:200].split(b"\n", 1)[0].split()
     if len(head) != 5 or not all(t.isdigit() for t in head):
         raise HTTPException(400, f"{name} does not start with the 'V E R C X' line of a Hash Code 2017 input")
-    return _public(_new_job(name, data, max(5.0, min(budget, 3600.0))))
+    return _public(_new_job(name, data, _budget(budget), _params(request)))
+
+
+@app.post("/api/jobs/{jid}/rerun")
+def rerun(jid: str, request: Request, budget: float = 300):
+    """Solve the same input again with the settings now chosen in the page."""
+    job = jobs.get(jid)
+    if not job:
+        raise HTTPException(404, "no such run")
+    with open(job["input"], "rb") as f:
+        return _public(_new_job(job["name"], f.read(), _budget(budget), _params(request)))
 
 
 @app.get("/api/library")
@@ -141,14 +176,14 @@ def library():
 
 
 @app.post("/api/library/{name}")
-def add_from_library(name: str, budget: float = 300, group: str = ""):
+def add_from_library(name: str, request: Request, budget: float = 300, group: str = ""):
     for g, folder in LIBRARY:
         if group and g != group:
             continue
         path = os.path.join(folder, os.path.basename(name))
         if os.path.isfile(path):
             with open(path, "rb") as f:
-                return _public(_new_job(name, f.read(), max(5.0, min(budget, 3600.0))))
+                return _public(_new_job(name, f.read(), _budget(budget), _params(request)))
     raise HTTPException(404, f"{name} is not in the library")
 
 
@@ -198,7 +233,8 @@ def download_all():
     buf = io.BytesIO()
     seen = set()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        lines = ["instance,score,method,proven_upper_bound,seconds"]
+        keys = list(solve.DEFAULTS)
+        lines = ["instance,score,method,proven_upper_bound,seconds,budget," + ",".join(keys)]
         for j in done:
             name = _out_name(j)
             if name in seen:                          # same file run twice
@@ -206,7 +242,8 @@ def download_all():
             seen.add(name)
             z.write(j["output"], name)
             r = j["result"]
-            lines.append(f"{j['name']},{r['score']},{r['method']},{r['bound'] or ''},{r['seconds']}")
+            lines.append(f"{j['name']},{r['score']},{r['method']},{r['bound'] or ''},{r['seconds']},{j['budget']},"
+                         + ",".join(str(j["params"][k]) for k in keys))
         z.writestr("scores.csv", "\n".join(lines) + "\n")
     return Response(buf.getvalue(), media_type="application/zip",
                     headers={"Content-Disposition": 'attachment; filename="outputs.zip"'})
