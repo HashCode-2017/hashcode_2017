@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="510" viewBox="0 0 960 510" role="img" aria-label="Score after each stage on two data sets" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif">
+<title>Score after each stage on two data sets</title>
+<defs><marker id="m-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#52514e"/></marker><marker id="m-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2a78d6"/></marker><marker id="m-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#008300"/></marker><marker id="m-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e34948"/></marker><marker id="m-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6250d6"/></marker><marker id="m-aqua" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1baf7a"/></marker><marker id="m-magenta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c94f7f"/></marker><marker id="m-yellow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b07800"/></marker><marker id="m-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6834"/></marker><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#fbe2e2"/><line x1="0" y1="0" x2="0" y2="8" stroke="#e34948" stroke-width="2" opacity="0.55"/></pattern></defs>
+<rect x="0.5" y="0.5" width="959" height="509" rx="14" fill="#fcfcfb" stroke="#e4e3df"/>
+<text x="28" y="39" font-size="20" font-weight="700" fill="#0b0b0b" text-anchor="start">What each stage is worth</text>
+<text x="28" y="64" font-size="13.5" font-weight="400" fill="#52514e" text-anchor="start">Scores from PIPELINE.md. Each panel has its own axis; the score never goes down from one step to the next.</text>
+<text x="36" y="100" font-size="14" font-weight="700" fill="#0b0b0b" text-anchor="start">videos_worth_spreading</text>
+<line x1="96" y1="384.0" x2="536" y2="384.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="88" y="388.0" font-size="11.5" font-weight="400" fill="#8a8984" text-anchor="end">606K</text>
+<line x1="96" y1="320.5" x2="536" y2="320.5" stroke="#e4e3df" stroke-width="1"/>
+<text x="88" y="324.5" font-size="11.5" font-weight="400" fill="#8a8984" text-anchor="end">610K</text>
+<line x1="96" y1="257.0" x2="536" y2="257.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="88" y="261.0" font-size="11.5" font-weight="400" fill="#8a8984" text-anchor="end">614K</text>
+<line x1="96" y1="193.5" x2="536" y2="193.5" stroke="#e4e3df" stroke-width="1"/>
+<text x="88" y="197.5" font-size="11.5" font-weight="400" fill="#8a8984" text-anchor="end">618K</text>
+<line x1="96" y1="130.0" x2="536" y2="130.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="88" y="134.0" font-size="11.5" font-weight="400" fill="#8a8984" text-anchor="end">622K</text>
+<line x1="96" y1="161.6" x2="536" y2="161.6" stroke="#52514e" stroke-width="1"/>
+<text x="102" y="155.6" font-size="11.5" font-weight="600" fill="#52514e" text-anchor="start">proven upper bound 620,009</text>
+<path d="M126.0,330.3 L221.0,312.5 L316.0,277.2 L411.0,264.2 L506.0,259.4" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<g><title>Greedy: 609,385</title><circle cx="126.0" cy="330.3" r="12" fill="transparent"/><circle cx="126.0" cy="330.3" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/></g>
+<text x="126" y="404" font-size="11.5" font-weight="600" fill="#52514e" text-anchor="middle">Greedy</text>
+<text x="126" y="352" font-size="12.5" font-weight="700" fill="#0b0b0b" text-anchor="middle">609,385</text>
+<g><title>Re-pack: 610,505</title><circle cx="221.0" cy="312.5" r="12" fill="transparent"/><circle cx="221.0" cy="312.5" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/></g>
+<text x="221" y="404" font-size="11.5" font-weight="600" fill="#52514e" text-anchor="middle">Re-pack</text>
+<g><title>LNS|60 s: 612,727</title><circle cx="316.0" cy="277.2" r="12" fill="transparent"/><circle cx="316.0" cy="277.2" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/></g>
+<text x="316" y="404" font-size="11.5" font-weight="600" fill="#52514e" text-anchor="middle">LNS</text>
+<text x="316" y="419" font-size="11.5" font-weight="400" fill="#8a8984" text-anchor="middle">60 s</text>
+<g><title>LNS|180 s: 613,548</title><circle cx="411.0" cy="264.2" r="12" fill="transparent"/><circle cx="411.0" cy="264.2" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/></g>
+<text x="411" y="404" font-size="11.5" font-weight="600" fill="#52514e" text-anchor="middle">LNS</text>
+<text x="411" y="419" font-size="11.5" font-weight="400" fill="#8a8984" text-anchor="middle">180 s</text>
+<g><title>LNS|480 s: 613,851</title><circle cx="506.0" cy="259.4" r="12" fill="transparent"/><circle cx="506.0" cy="259.4" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/></g>
+<text x="506" y="404" font-size="11.5" font-weight="600" fill="#52514e" text-anchor="middle">LNS</text>
+<text x="506" y="419" font-size="11.5" font-weight="400" fill="#8a8984" text-anchor="middle">480 s</text>
+<text x="496" y="249" font-size="12.5" font-weight="700" fill="#0b0b0b" text-anchor="end">613,851</text>
+<text x="580" y="100" font-size="14" font-weight="700" fill="#0b0b0b" text-anchor="start">me_at_the_zoo</text>
+<line x1="640" y1="384.0" x2="912" y2="384.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="632" y="388.0" font-size="11.5" font-weight="400" fill="#8a8984" text-anchor="end">504K</text>
+<line x1="640" y1="320.5" x2="912" y2="320.5" stroke="#e4e3df" stroke-width="1"/>
+<text x="632" y="324.5" font-size="11.5" font-weight="400" fill="#8a8984" text-anchor="end">508K</text>
+<line x1="640" y1="257.0" x2="912" y2="257.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="632" y="261.0" font-size="11.5" font-weight="400" fill="#8a8984" text-anchor="end">512K</text>
+<line x1="640" y1="193.5" x2="912" y2="193.5" stroke="#e4e3df" stroke-width="1"/>
+<text x="632" y="197.5" font-size="11.5" font-weight="400" fill="#8a8984" text-anchor="end">516K</text>
+<line x1="640" y1="130.0" x2="912" y2="130.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="632" y="134.0" font-size="11.5" font-weight="400" fill="#8a8984" text-anchor="end">520K</text>
+<line x1="640" y1="184.7" x2="912" y2="184.7" stroke="#52514e" stroke-width="1"/>
+<text x="646" y="178.7" font-size="11.5" font-weight="600" fill="#52514e" text-anchor="start">proven optimum</text>
+<path d="M670.0,322.0 L776.0,255.2 L882.0,184.7" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<g><title>Greedy: 507,906</title><circle cx="670.0" cy="322.0" r="12" fill="transparent"/><circle cx="670.0" cy="322.0" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/></g>
+<text x="670" y="404" font-size="11.5" font-weight="600" fill="#52514e" text-anchor="middle">Greedy</text>
+<text x="670" y="344" font-size="12.5" font-weight="700" fill="#0b0b0b" text-anchor="middle">507,906</text>
+<g><title>Re-pack: 512,115</title><circle cx="776.0" cy="255.2" r="12" fill="transparent"/><circle cx="776.0" cy="255.2" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/></g>
+<text x="776" y="404" font-size="11.5" font-weight="600" fill="#52514e" text-anchor="middle">Re-pack</text>
+<g><title>Exact: 516,557</title><circle cx="882.0" cy="184.7" r="12" fill="transparent"/><circle cx="882.0" cy="184.7" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/></g>
+<text x="882" y="404" font-size="11.5" font-weight="600" fill="#52514e" text-anchor="middle">Exact</text>
+<text x="872" y="175" font-size="12.5" font-weight="700" fill="#0b0b0b" text-anchor="end">516,557</text>
+<text x="36" y="466" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="start">Big gains come early; LNS keeps adding slowly with more time. The exact model either solves the data set (zoo)</text>
+<text x="36" y="485" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="start">or bounds how much is left to win (videos: at most 6,158 more points).</text>
+</svg>

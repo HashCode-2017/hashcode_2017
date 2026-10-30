@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="660" viewBox="0 0 960 660" role="img" aria-label="Flowchart of one greedy round" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif">
+<title>Flowchart of one greedy round</title>
+<defs><marker id="m-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#52514e"/></marker><marker id="m-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2a78d6"/></marker><marker id="m-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#008300"/></marker><marker id="m-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e34948"/></marker><marker id="m-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6250d6"/></marker><marker id="m-aqua" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1baf7a"/></marker><marker id="m-magenta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c94f7f"/></marker><marker id="m-yellow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b07800"/></marker><marker id="m-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6834"/></marker><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#fbe2e2"/><line x1="0" y1="0" x2="0" y2="8" stroke="#e34948" stroke-width="2" opacity="0.55"/></pattern></defs>
+<rect x="0.5" y="0.5" width="959" height="659" rx="14" fill="#fcfcfb" stroke="#e4e3df"/>
+<rect x="28" y="20" width="133" height="22" rx="11.0" fill="#ebe8fa" stroke="#6250d6" stroke-width="1.2"/>
+<text x="95" y="35" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">STAGE 1 · GREEDY</text>
+<text x="173" y="39" font-size="20" font-weight="700" fill="#0b0b0b" text-anchor="start">One greedy round</text>
+<text x="28" y="64" font-size="13.5" font-weight="400" fill="#52514e" text-anchor="start">solver.cpp: globalFill → evictDeadWeight → swapPass, up to 5 rounds</text>
+<text x="110" y="92" font-size="14" font-weight="700" fill="#0b0b0b" text-anchor="start">1a · Global fill (lazy max-heap)</text>
+<rect x="110" y="102" width="300" height="58" rx="10" fill="#ebe8fa" stroke="#6250d6" stroke-width="1.5"/>
+<text x="260.0" y="120" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">Score every (cache, video) pair</text>
+<text x="260.0" y="137" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">= requests × ms saved, counting only</text>
+<text x="260.0" y="153" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">time that is not saved already</text>
+<line x1="260" y1="160" x2="260" y2="178" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
+<rect x="110" y="180" width="300" height="46" rx="10" fill="#ebe8fa" stroke="#6250d6" stroke-width="1.5"/>
+<text x="260.0" y="200" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">Push them all into one max-heap</text>
+<text x="260.0" y="217" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">best first: most time saved per MB</text>
+<line x1="260" y1="226" x2="260" y2="244" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
+<rect x="110" y="246" width="300" height="40" rx="10" fill="#ebe8fa" stroke="#6250d6" stroke-width="1.5"/>
+<text x="260.0" y="271" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">Pop the best pair</text>
+<line x1="260" y1="286" x2="260" y2="302" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
+<polygon points="260,303.0 350.0,334 260,365.0 170.0,334" fill="#f1f0ec" stroke="#52514e" stroke-width="1.5"/>
+<text x="260" y="330" font-size="13" font-weight="600" fill="#0b0b0b" text-anchor="middle">still fits</text>
+<text x="260" y="347" font-size="13" font-weight="600" fill="#0b0b0b" text-anchor="middle">in the cache?</text>
+<line x1="170" y1="334" x2="152" y2="334" stroke="#e34948" stroke-width="1.5" marker-end="url(#m-red)"/>
+<text x="178" y="326" font-size="12" font-weight="600" fill="#52514e" text-anchor="end">no</text>
+<rect x="66" y="322" width="61" height="22" rx="11.0" fill="#fbe2e2" stroke="#e34948" stroke-width="1.2"/>
+<text x="97" y="337" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">✗ drop</text>
+<line x1="260" y1="365" x2="260" y2="384" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
+<text x="268" y="379" font-size="12" font-weight="600" fill="#52514e" text-anchor="start">yes</text>
+<rect x="110" y="386" width="300" height="44" rx="10" fill="#ebe8fa" stroke="#6250d6" stroke-width="1.5"/>
+<text x="260.0" y="405" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">Check its value again</text>
+<text x="260.0" y="422" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">earlier copies may have made it worth less</text>
+<line x1="260" y1="430" x2="260" y2="448" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
+<polygon points="260,450.0 355.0,486 260,522.0 165.0,486" fill="#f1f0ec" stroke="#52514e" stroke-width="1.5"/>
+<text x="260" y="482" font-size="13" font-weight="600" fill="#0b0b0b" text-anchor="middle">worth the same</text>
+<text x="260" y="499" font-size="13" font-weight="600" fill="#0b0b0b" text-anchor="middle">as before?</text>
+<line x1="165" y1="486" x2="152" y2="486" stroke="#e34948" stroke-width="1.5" marker-end="url(#m-red)"/>
+<text x="176" y="476" font-size="12" font-weight="600" fill="#52514e" text-anchor="end">now 0</text>
+<rect x="66" y="474" width="61" height="22" rx="11.0" fill="#fbe2e2" stroke="#e34948" stroke-width="1.2"/>
+<text x="97" y="489" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">✗ drop</text>
+<line x1="355" y1="486" x2="438" y2="486" stroke="#b07800" stroke-width="1.5" marker-end="url(#m-yellow)"/>
+<text x="396" y="478" font-size="12" font-weight="600" fill="#52514e" text-anchor="middle">less</text>
+<rect x="440" y="462" width="160" height="48" rx="10" fill="#fcf0d4" stroke="#eda100" stroke-width="1.5"/>
+<text x="520.0" y="483" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">Push it back</text>
+<text x="520.0" y="500" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">with the new key</text>
+<path d="M520,462 V276 H412" fill="none" stroke="#b07800" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#m-yellow)"/>
+<line x1="260" y1="522" x2="260" y2="546" stroke="#008300" stroke-width="1.5" marker-end="url(#m-green)"/>
+<text x="268" y="540" font-size="12" font-weight="600" fill="#52514e" text-anchor="start">same</text>
+<rect x="110" y="548" width="300" height="54" rx="10" fill="#e0f0e0" stroke="#008300" stroke-width="1.5"/>
+<text x="260.0" y="572" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">✓ Place it</text>
+<text x="260.0" y="589" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">the requests it speeds up are now faster</text>
+<path d="M110,575 H40 V266 H108" fill="none" stroke="#008300" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#m-green)"/>
+<path d="M410,254 H440 V128 H652" fill="none" stroke="#52514e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#m-ink)"/>
+<text x="448" y="120" font-size="12" font-weight="600" fill="#52514e" text-anchor="start">heap empty</text>
+<rect x="654" y="92" width="278" height="72" rx="10" fill="#ebe8fa" stroke="#6250d6" stroke-width="1.5"/>
+<text x="793.0" y="117" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">1b · Evict dead weight</text>
+<text x="793.0" y="134" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">delete a copy if every endpoint that</text>
+<text x="793.0" y="150" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">wants it gets it as fast elsewhere</text>
+<line x1="793" y1="164" x2="793" y2="192" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
+<rect x="654" y="194" width="278" height="72" rx="10" fill="#ebe8fa" stroke="#6250d6" stroke-width="1.5"/>
+<text x="793.0" y="219" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">1c · Swap</text>
+<text x="793.0" y="236" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">give up the least useful copies for a</text>
+<text x="793.0" y="252" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">better video, if we win more than we lose</text>
+<line x1="793" y1="266" x2="793" y2="292" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
+<polygon points="793,294.0 918.0,340 793,386.0 668.0,340" fill="#f1f0ec" stroke="#52514e" stroke-width="1.5"/>
+<text x="793" y="328" font-size="13" font-weight="600" fill="#0b0b0b" text-anchor="middle">anything changed,</text>
+<text x="793" y="345" font-size="13" font-weight="600" fill="#0b0b0b" text-anchor="middle">round &lt; 5 and</text>
+<text x="793" y="362" font-size="13" font-weight="600" fill="#0b0b0b" text-anchor="middle">time left?</text>
+<path d="M918,340 H944 V74 H395 V100" fill="none" stroke="#52514e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#m-ink)"/>
+<text x="924" y="332" font-size="12" font-weight="600" fill="#52514e" text-anchor="start">yes</text>
+<text x="600" y="70" font-size="12" font-weight="600" fill="#52514e" text-anchor="middle">next round</text>
+<line x1="793" y1="386" x2="793" y2="414" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
+<text x="801" y="406" font-size="12" font-weight="600" fill="#52514e" text-anchor="start">no</text>
+<rect x="674" y="416" width="238" height="46" rx="10" fill="#dcf3ea" stroke="#1baf7a" stroke-width="1.5"/>
+<text x="793.0" y="436" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">Greedy done</text>
+<text x="793.0" y="453" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">→ stage 2, the re-pack</text>
+<rect x="640" y="490" width="292" height="112" rx="10" fill="#f1f0ec"/>
+<text x="656" y="514" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">Why “lazy” is safe: placing a copy can</text>
+<text x="656" y="533" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">only make other pairs worth less, never</text>
+<text x="656" y="552" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">more. So if a pair is still worth what the</text>
+<text x="656" y="571" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">heap says, nothing below it can beat it.</text>
+<text x="40" y="636" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="start">Fast on big data sets: a cache only ever looks at the videos its own users ask for, never the whole catalogue.</text>
+</svg>

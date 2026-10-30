@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="630" viewBox="0 0 960 630" role="img" aria-label="The Streaming Videos problem on example.in" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif">
+<title>The Streaming Videos problem on example.in</title>
+<defs><marker id="m-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#52514e"/></marker><marker id="m-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2a78d6"/></marker><marker id="m-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#008300"/></marker><marker id="m-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e34948"/></marker><marker id="m-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6250d6"/></marker><marker id="m-aqua" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1baf7a"/></marker><marker id="m-magenta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c94f7f"/></marker><marker id="m-yellow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b07800"/></marker><marker id="m-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6834"/></marker><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#fbe2e2"/><line x1="0" y1="0" x2="0" y2="8" stroke="#e34948" stroke-width="2" opacity="0.55"/></pattern></defs>
+<rect x="0.5" y="0.5" width="959" height="629" rx="14" fill="#fcfcfb" stroke="#e4e3df"/>
+<text x="28" y="39" font-size="20" font-weight="700" fill="#0b0b0b" text-anchor="start">The problem: copy videos into caches</text>
+<text x="28" y="64" font-size="13.5" font-weight="400" fill="#52514e" text-anchor="start">The worked example from the statement (example.in). Latencies in ms, sizes in MB.</text>
+<rect x="170" y="92" width="240" height="60" rx="10" fill="#f1f0ec" stroke="#52514e" stroke-width="1.5"/>
+<text x="290.0" y="119" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">Data center</text>
+<text x="290.0" y="137" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="middle">holds every video</text>
+<rect x="80" y="232" width="120" height="58" rx="10" fill="#e3eefb" stroke="#2a78d6" stroke-width="1.5"/>
+<text x="140.0" y="258" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">Cache 0</text>
+<text x="140.0" y="276" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="middle">100 MB</text>
+<rect x="245" y="232" width="120" height="58" rx="10" fill="#e3eefb" stroke="#2a78d6" stroke-width="1.5"/>
+<text x="305.0" y="258" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">Cache 1</text>
+<text x="305.0" y="276" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="middle">100 MB</text>
+<rect x="410" y="232" width="120" height="58" rx="10" fill="#e3eefb" stroke="#2a78d6" stroke-width="1.5"/>
+<text x="470.0" y="258" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">Cache 2</text>
+<text x="470.0" y="276" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="middle">100 MB</text>
+<rect x="170" y="382" width="140" height="58" rx="10" fill="#fde6dc" stroke="#eb6834" stroke-width="1.5"/>
+<text x="240.0" y="408" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">Endpoint 0</text>
+<text x="240.0" y="425" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">data center: 1000</text>
+<rect x="400" y="382" width="140" height="58" rx="10" fill="#fde6dc" stroke="#eb6834" stroke-width="1.5"/>
+<text x="470.0" y="408" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">Endpoint 1</text>
+<text x="470.0" y="425" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">data center: 500</text>
+<text x="470" y="458" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle" font-style="italic">no linked cache</text>
+<line x1="240" y1="382" x2="140" y2="290" stroke="#2a78d6" stroke-width="2"/>
+<line x1="240" y1="382" x2="305" y2="290" stroke="#2a78d6" stroke-width="2"/>
+<line x1="240" y1="382" x2="470" y2="290" stroke="#2a78d6" stroke-width="2"/>
+<rect x="160" y="326" width="52" height="20" rx="10" fill="#fcfcfb" stroke="#2a78d6" stroke-width="1"/>
+<text x="186" y="340" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">100 ms</text>
+<rect x="250" y="326" width="52" height="20" rx="10" fill="#fcfcfb" stroke="#2a78d6" stroke-width="1"/>
+<text x="276" y="340" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">300 ms</text>
+<rect x="340" y="326" width="52" height="20" rx="10" fill="#fcfcfb" stroke="#2a78d6" stroke-width="1"/>
+<text x="366" y="340" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">200 ms</text>
+<path d="M170,411 H40 V122 H170" fill="none" stroke="#52514e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<rect x="11" y="252" width="58" height="20" rx="10" fill="#fcfcfb" stroke="#52514e" stroke-width="1"/>
+<text x="40" y="266" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">1000 ms</text>
+<path d="M540,411 H570 V122 H410" fill="none" stroke="#52514e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<rect x="544" y="252" width="52" height="20" rx="10" fill="#fcfcfb" stroke="#52514e" stroke-width="1"/>
+<text x="570" y="266" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">500 ms</text>
+<line x1="40" y1="494" x2="70" y2="494" stroke="#2a78d6" stroke-width="2"/>
+<text x="78" y="498" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="start">endpoint–cache link (fast)</text>
+<line x1="260" y1="494" x2="290" y2="494" stroke="#52514e" stroke-width="2"/>
+<text x="298" y="498" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="start">endpoint–data center link (slow)</text>
+<text x="620" y="104" font-size="14" font-weight="700" fill="#0b0b0b" text-anchor="start">Videos (size in MB)</text>
+<rect x="620" y="116" width="56" height="24" rx="6" fill="#f1f0ec" stroke="#b9b8b1" stroke-width="1.2"/>
+<text x="648.0" y="132" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">v0  50</text>
+<rect x="682" y="116" width="56" height="24" rx="6" fill="#f1f0ec" stroke="#b9b8b1" stroke-width="1.2"/>
+<text x="710.0" y="132" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">v1  50</text>
+<rect x="744" y="116" width="56" height="24" rx="6" fill="#f1f0ec" stroke="#b9b8b1" stroke-width="1.2"/>
+<text x="772.0" y="132" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">v2  80</text>
+<rect x="806" y="116" width="56" height="24" rx="6" fill="#f1f0ec" stroke="#b9b8b1" stroke-width="1.2"/>
+<text x="834.0" y="132" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">v3  30</text>
+<rect x="868" y="116" width="56" height="24" rx="6" fill="#fbe2e2" stroke="#e34948" stroke-width="1.2"/>
+<text x="896.0" y="132" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">v4  110</text>
+<text x="620" y="160" font-size="12" font-weight="400" fill="#52514e" text-anchor="start">v4 (110 MB) is bigger than any cache: it can never be copied.</text>
+<text x="620" y="196" font-size="14" font-weight="700" fill="#0b0b0b" text-anchor="start">Requests</text>
+<text x="620" y="218" font-size="12" font-weight="600" fill="#8a8984" text-anchor="start">who</text>
+<text x="740" y="218" font-size="12" font-weight="600" fill="#8a8984" text-anchor="start">video</text>
+<text x="920" y="218" font-size="12" font-weight="600" fill="#8a8984" text-anchor="end">count</text>
+<text x="620" y="242" font-size="13.5" font-weight="400" fill="#0b0b0b" text-anchor="start">Endpoint 0</text>
+<text x="740" y="242" font-size="13.5" font-weight="600" fill="#0b0b0b" text-anchor="start">v3</text>
+<text x="920" y="242" font-size="13.5" font-weight="400" fill="#0b0b0b" text-anchor="end">1500</text>
+<text x="620" y="266" font-size="13.5" font-weight="400" fill="#0b0b0b" text-anchor="start">Endpoint 0</text>
+<text x="740" y="266" font-size="13.5" font-weight="600" fill="#0b0b0b" text-anchor="start">v4</text>
+<text x="920" y="266" font-size="13.5" font-weight="400" fill="#0b0b0b" text-anchor="end">500</text>
+<text x="620" y="290" font-size="13.5" font-weight="400" fill="#0b0b0b" text-anchor="start">Endpoint 0</text>
+<text x="740" y="290" font-size="13.5" font-weight="600" fill="#0b0b0b" text-anchor="start">v1</text>
+<text x="920" y="290" font-size="13.5" font-weight="400" fill="#0b0b0b" text-anchor="end">1000</text>
+<text x="620" y="314" font-size="13.5" font-weight="400" fill="#0b0b0b" text-anchor="start">Endpoint 1</text>
+<text x="740" y="314" font-size="13.5" font-weight="600" fill="#0b0b0b" text-anchor="start">v0</text>
+<text x="920" y="314" font-size="13.5" font-weight="400" fill="#0b0b0b" text-anchor="end">1000</text>
+<line x1="620" y1="340" x2="930" y2="340" stroke="#e4e3df" stroke-width="1"/>
+<text x="620" y="358" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="start">total requests</text>
+<text x="920" y="358" font-size="12.5" font-weight="600" fill="#0b0b0b" text-anchor="end">4000</text>
+<rect x="614" y="380" width="322" height="92" rx="10" fill="#e3eefb" stroke="#2a78d6" stroke-width="1.5"/>
+<text x="628" y="404" font-size="13.5" font-weight="400" fill="#0b0b0b" text-anchor="start">A request is served by the fastest</text>
+<text x="628" y="424" font-size="13.5" font-weight="400" fill="#0b0b0b" text-anchor="start">linked cache that holds the video,</text>
+<text x="628" y="444" font-size="13.5" font-weight="400" fill="#0b0b0b" text-anchor="start">otherwise by the data center.</text>
+<rect x="28" y="522" width="904" height="86" rx="10" fill="#f1f0ec"/>
+<text x="48" y="552" font-size="14.5" font-weight="600" fill="#0b0b0b" text-anchor="start">saving of a request group  =  count × (data-center latency − latency actually used)</text>
+<text x="48" y="580" font-size="14.5" font-weight="600" fill="#0b0b0b" text-anchor="start">score  =  sum of all savings × 1000 ÷ total requests</text>
+<text x="48" y="600" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="start">The only decision: which videos go into which caches, without exceeding any cache&#x27;s MB.</text>
+</svg>

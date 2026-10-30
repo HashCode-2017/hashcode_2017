@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="822" viewBox="0 0 960 822" role="img" aria-label="Overview of the pipeline run by solve.py" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif">
+<title>Overview of the pipeline run by solve.py</title>
+<defs><marker id="m-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#52514e"/></marker><marker id="m-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2a78d6"/></marker><marker id="m-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#008300"/></marker><marker id="m-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e34948"/></marker><marker id="m-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6250d6"/></marker><marker id="m-aqua" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1baf7a"/></marker><marker id="m-magenta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c94f7f"/></marker><marker id="m-yellow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b07800"/></marker><marker id="m-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6834"/></marker><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#fbe2e2"/><line x1="0" y1="0" x2="0" y2="8" stroke="#e34948" stroke-width="2" opacity="0.55"/></pattern></defs>
+<rect x="0.5" y="0.5" width="959" height="821" rx="14" fill="#fcfcfb" stroke="#e4e3df"/>
+<text x="28" y="39" font-size="20" font-weight="700" fill="#0b0b0b" text-anchor="start">The whole pipeline (solve.py)</text>
+<text x="28" y="64" font-size="13.5" font-weight="400" fill="#52514e" text-anchor="start">Two branches run at the same time; every output is re-scored and the best valid one is kept.</text>
+<rect x="320" y="86" width="320" height="44" rx="10" fill="#fcfcfb" stroke="#52514e" stroke-width="1.5"/>
+<text x="480.0" y="113" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">Input .in file</text>
+<line x1="480" y1="130" x2="480" y2="148" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
+<rect x="300" y="150" width="360" height="52" rx="10" fill="#f1f0ec" stroke="#52514e" stroke-width="1.5"/>
+<text x="480.0" y="173" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">Read and index</text>
+<text x="480.0" y="191" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="middle">sum duplicate request lines · build the lookups</text>
+<line x1="480" y1="202" x2="480" y2="220" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
+<rect x="300" y="222" width="360" height="52" rx="10" fill="#f1f0ec" stroke="#52514e" stroke-width="1.5"/>
+<text x="480.0" y="245" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">Measure the exact model</text>
+<text x="480.0" y="263" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="middle">y variables = request groups × faster caches</text>
+<path d="M480,274 V294 H250 V330" fill="none" stroke="#52514e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#m-ink)"/>
+<path d="M480,294 H720 V330" fill="none" stroke="#52514e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#m-ink)"/>
+<text x="365" y="288" font-size="12.5" font-weight="600" fill="#52514e" text-anchor="middle">always</text>
+<text x="600" y="288" font-size="12.5" font-weight="600" fill="#52514e" text-anchor="middle">only if ≤ 50,000 variables</text>
+<rect x="70" y="332" width="360" height="300" rx="14" fill="#fcfcfb" stroke="#c9c8c2" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="90" y="356" font-size="13.5" font-weight="700" fill="#0b0b0b" text-anchor="start">Branch 1 · solver.cpp --lns</text>
+<rect x="100" y="370" width="300" height="50" rx="10" fill="#ebe8fa" stroke="#6250d6" stroke-width="1.5"/>
+<text x="250.0" y="392" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">1 · Greedy</text>
+<text x="250.0" y="410" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="middle">≤ 5 rounds of fill · evict · swap</text>
+<line x1="250" y1="420" x2="250" y2="436" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
+<rect x="100" y="438" width="300" height="50" rx="10" fill="#dcf3ea" stroke="#1baf7a" stroke-width="1.5"/>
+<text x="250.0" y="460" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">2 · Exact re-pack</text>
+<text x="250.0" y="478" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="middle">one cache at a time, until stable</text>
+<line x1="250" y1="488" x2="250" y2="504" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
+<rect x="100" y="506" width="300" height="50" rx="10" fill="#fbe7ef" stroke="#e87ba4" stroke-width="1.5"/>
+<text x="250.0" y="528" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">3 · LNS</text>
+<text x="250.0" y="546" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="middle">rebuild 2 linked caches, until time is up</text>
+<line x1="250" y1="556" x2="250" y2="572" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
+<rect x="100" y="574" width="300" height="44" rx="10" fill="#dcf3ea" stroke="#1baf7a" stroke-width="1.5"/>
+<text x="250.0" y="601" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">4 · Final re-pack sweep</text>
+<rect x="530" y="332" width="380" height="300" rx="14" fill="#fcfcfb" stroke="#c9c8c2" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="550" y="356" font-size="13.5" font-weight="700" fill="#0b0b0b" text-anchor="start">Branch 2 · exact.py (small data sets)</text>
+<rect x="570" y="370" width="300" height="50" rx="10" fill="#fcf0d4" stroke="#eda100" stroke-width="1.5"/>
+<text x="720.0" y="392" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">Exact MILP (HiGHS)</text>
+<text x="720.0" y="410" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="middle">up to half of the time budget</text>
+<line x1="720" y1="420" x2="720" y2="438" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
+<polygon points="720,438.0 825.0,470 720,502.0 615.0,470" fill="#f1f0ec" stroke="#52514e" stroke-width="1.5"/>
+<text x="720" y="475" font-size="13" font-weight="600" fill="#0b0b0b" text-anchor="middle">proven optimal?</text>
+<path d="M615,470 H630 V530" fill="none" stroke="#52514e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#m-ink)"/>
+<path d="M825,470 H810 V530" fill="none" stroke="#52514e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#m-ink)"/>
+<text x="606" y="462" font-size="12.5" font-weight="600" fill="#52514e" text-anchor="end">yes</text>
+<text x="834" y="462" font-size="12.5" font-weight="600" fill="#52514e" text-anchor="start">no</text>
+<rect x="548" y="532" width="164" height="72" rx="10" fill="#e0f0e0" stroke="#008300" stroke-width="1.5"/>
+<text x="630.0" y="557" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">Stop branch 1</text>
+<text x="630.0" y="574" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">nothing can beat</text>
+<text x="630.0" y="590" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">a proven optimum</text>
+<rect x="728" y="532" width="164" height="72" rx="10" fill="#fbe7ef" stroke="#e87ba4" stroke-width="1.5"/>
+<text x="810.0" y="557" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">LNS from it</text>
+<text x="810.0" y="574" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">solver --start</text>
+<text x="810.0" y="590" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">exact.out --lns</text>
+<text x="480" y="470" font-size="12.5" font-weight="600" fill="#8a8984" text-anchor="middle">run in</text>
+<text x="480" y="488" font-size="12.5" font-weight="600" fill="#8a8984" text-anchor="middle">parallel</text>
+<path d="M250,632 V683 H268" fill="none" stroke="#52514e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#m-ink)"/>
+<path d="M720,632 V683 H692" fill="none" stroke="#52514e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#m-ink)"/>
+<rect x="270" y="656" width="420" height="54" rx="10" fill="#f1f0ec" stroke="#52514e" stroke-width="1.5"/>
+<text x="480.0" y="680" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">Re-score every output with solution.score()</text>
+<text x="480.0" y="698" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="middle">reject any cache over capacity · keep the best score</text>
+<line x1="480" y1="710" x2="480" y2="728" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
+<rect x="370" y="730" width="220" height="40" rx="10" fill="#fcfcfb" stroke="#52514e" stroke-width="1.5"/>
+<text x="480.0" y="755" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">Best .out file</text>
+<text x="480" y="800" font-size="13" font-weight="600" fill="#52514e" text-anchor="middle">Every stage keeps a change only if the score does not drop, so the score can only go up.</text>
+</svg>

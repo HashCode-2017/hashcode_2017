@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="352" viewBox="0 0 960 352" role="img" aria-label="How eviction works" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif">
+<title>How eviction works</title>
+<defs><marker id="m-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#52514e"/></marker><marker id="m-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2a78d6"/></marker><marker id="m-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#008300"/></marker><marker id="m-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e34948"/></marker><marker id="m-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6250d6"/></marker><marker id="m-aqua" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1baf7a"/></marker><marker id="m-magenta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c94f7f"/></marker><marker id="m-yellow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b07800"/></marker><marker id="m-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6834"/></marker><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#fbe2e2"/><line x1="0" y1="0" x2="0" y2="8" stroke="#e34948" stroke-width="2" opacity="0.55"/></pattern></defs>
+<rect x="0.5" y="0.5" width="959" height="351" rx="14" fill="#fcfcfb" stroke="#e4e3df"/>
+<rect x="28" y="20" width="133" height="22" rx="11.0" fill="#ebe8fa" stroke="#6250d6" stroke-width="1.2"/>
+<text x="95" y="35" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">STAGE 1 · GREEDY</text>
+<text x="173" y="39" font-size="20" font-weight="700" fill="#0b0b0b" text-anchor="start">Evict: delete copies that nobody uses</text>
+<rect x="70" y="84" width="140" height="64" rx="10" fill="#e3eefb" stroke="#2a78d6" stroke-width="1.5"/>
+<text x="140.0" y="113" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">Cache A</text>
+<text x="140.0" y="130" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">100 ms · holds v</text>
+<rect x="286" y="84" width="140" height="64" rx="10" fill="#e3eefb" stroke="#2a78d6" stroke-width="1.5"/>
+<text x="356.0" y="113" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">Cache B</text>
+<text x="356.0" y="130" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">300 ms · holds v</text>
+<rect x="178" y="236" width="140" height="48" rx="10" fill="#fde6dc" stroke="#eb6834" stroke-width="1.5"/>
+<text x="248.0" y="257" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">Users</text>
+<text x="248.0" y="274" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">want v</text>
+<line x1="222" y1="236" x2="150" y2="150" stroke="#008300" stroke-width="3" marker-end="url(#m-green)"/>
+<line x1="274" y1="236" x2="346" y2="150" stroke="#2a78d6" stroke-width="1.5" stroke-dasharray="5 4"/>
+<rect x="153" y="186" width="38" height="20" rx="10" fill="#fcfcfb" stroke="#008300" stroke-width="1"/>
+<text x="172" y="200" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">used</text>
+<rect x="287" y="186" width="78" height="20" rx="10" fill="#fcfcfb" stroke="#2a78d6" stroke-width="1"/>
+<text x="326" y="200" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">never used</text>
+<rect x="396" y="72" width="66" height="24" rx="12" fill="#fbe2e2" stroke="#e34948" stroke-width="1.2"/>
+<text x="429" y="88" font-size="12" font-weight="700" fill="#e34948" text-anchor="middle">delete</text>
+<rect x="492" y="72" width="440" height="230" rx="10" fill="#f1f0ec"/>
+<text x="510" y="98" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">The users get v from cache A in 100 ms.</text>
+<text x="510" y="117" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">Cache B&#x27;s copy of v (300 ms) is never used: everyone</text>
+<text x="510" y="136" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">who could use it already gets v faster from A.</text>
+<text x="510" y="155" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start"></text>
+<text x="510" y="174" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">So the copy is deleted. Nobody waits longer, the score</text>
+<text x="510" y="193" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">stays exactly the same, and cache B gets its space back</text>
+<text x="510" y="212" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">for something useful in the next round.</text>
+<text x="510" y="231" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start"></text>
+<text x="510" y="250" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">How it happens: during the fill, copies are added one at</text>
+<text x="510" y="269" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">a time and never removed, so a later copy (in A) can make</text>
+<text x="510" y="288" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">an earlier one (in B) useless.</text>
+<text x="46" y="330" font-size="12.5" font-weight="600" fill="#52514e" text-anchor="start">Rule: delete a copy only if EVERY user of that cache who wants the video already gets it at least as fast from somewhere else.</text>
+</svg>
