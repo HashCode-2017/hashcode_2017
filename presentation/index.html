@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Streaming Videos · Group D</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="fonts/fonts.css">
+<link rel="stylesheet" href="src/styles/main.css">
+<link rel="stylesheet" href="src/styles/scenes.css">
+<script type="importmap">
+{ "imports": {
+    "three": "./vendor/three/three.module.js",
+    "three/addons/": "./vendor/three/addons/",
+    "gsap": "./vendor/gsap/index.js"
+} }
+</script>
+</head>
+<body>
+<div id="viewport">
+  <div id="stage">
+    <div id="gl" class="hidden"></div>
+    <div id="labels"></div>
+    <div id="scene-root"></div>
+    <div id="chrome"></div>
+  </div>
+</div>
+<div id="blackout"></div>
+<div id="help"></div>
+<div id="toast"></div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

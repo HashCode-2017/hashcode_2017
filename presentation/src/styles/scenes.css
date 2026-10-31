@@ -1,0 +1,184 @@
+/* scene components */
+.area { position: absolute; left: 72px; right: 72px; top: 150px; bottom: 90px; }
+.col2 { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
+.say-line { font-size: 30px; line-height: 1.35; color: var(--ink); max-width: 1500px; }
+.say-line b { color: var(--fibre); font-weight: 600; }
+.kicker { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; font-size: 46px; line-height: 1.02; letter-spacing: .01em; }
+.big-num { font-family: var(--font-display); font-weight: 700; font-size: 92px; line-height: .9; letter-spacing: -.01em; }
+.big-num small { font-size: .45em; font-weight: 600; letter-spacing: .04em; }
+.stat { display: flex; flex-direction: column; gap: 6px; }
+.stat .lbl { font-size: 21px; color: var(--ink-2); line-height: 1.3; }
+.pill { display: inline-block; padding: 3px 10px; background: var(--bg-2); font-size: 20px; border-left: 4px solid var(--fibre); }
+.hl { background: linear-gradient(transparent 60%, var(--gain-soft) 60%); }
+
+/* ---- 2D network */
+.net text { font-family: var(--font-body); }
+.net .nlabel { font-family: var(--font-display); font-weight: 600; font-size: 25px; letter-spacing: .05em; text-transform: uppercase; fill: var(--ink); }
+.net .nlabel.inv, .net .nsub.inv { fill: #eef1f3; }
+.net .nsub { font-size: 18px; fill: var(--ink-3); }
+.net .dcnode rect:first-child { fill: var(--dc); }
+.net .dcnode .win { fill: rgba(255,255,255,.18); }
+.net .rack { fill: var(--rack); transition: stroke .3s; stroke: transparent; stroke-width: 5; }
+.net .bay { fill: var(--rack-2); }
+.net .cachenode.focus .rack { stroke: var(--gain); }
+.net .cachenode.place .rack { stroke: var(--pass); }
+.net .cachenode.drop .rack { stroke: var(--fail); }
+.net .cachenode.dim { opacity: .4; }
+.net .cachenode, .net .epnode { transition: opacity .3s; }
+.net .epbox { fill: var(--panel); stroke: var(--line); stroke-width: 2; }
+.net .vlabel { font-family: var(--font-mono); font-size: 17px; font-weight: 600; fill: #fff; }
+.net .rq { font-family: var(--font-mono); font-size: 19px; fill: var(--ink-2); }
+.net .served { font-family: var(--font-mono); font-size: 17px; }
+.net .served.fast { fill: var(--cache); } .net .served.slow { fill: var(--ink-3); }
+.net .link path { fill: none; stroke-width: 4; transition: stroke .3s, stroke-width .3s, opacity .3s; }
+.net .link.cache path { stroke: var(--fibre); opacity: .45; }
+.net .link.dc path { stroke: var(--ink-3); stroke-dasharray: 10 8; opacity: .6; stroke-width: 3; }
+.net .link.hot path { opacity: 1; stroke-width: 6; }
+.net .link .lat { font-family: var(--font-mono); font-size: 17px; fill: var(--ink-2); paint-order: stroke; stroke: var(--bg); stroke-width: 6px; }
+.net .ghost rect { stroke: var(--gain); stroke-width: 3; stroke-dasharray: 6 4; }
+.net .ghost.drop rect { stroke: var(--fail); opacity: .55; }
+.net .cart rect { transition: opacity .3s; }
+
+/* ---- the greedy queue table */
+.queue { width: 100%; border-collapse: collapse; font-size: 22px; }
+.queue th { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: .08em; font-size: 17px; color: var(--ink-3); text-align: left; padding: 6px 10px; border-bottom: 2px solid var(--ink); }
+.queue td { padding: 7px 10px; border-bottom: 1px solid var(--line-2); font-family: var(--font-mono); font-size: 21px; transition: background .3s, opacity .3s; }
+.queue td.r { text-align: right; }
+.queue tr.cur td { background: var(--gain-soft); }
+.queue tr.done-place td { color: var(--pass); }
+.queue tr.done-drop td { color: var(--ink-3); text-decoration: line-through; text-decoration-color: var(--fail); }
+.queue .dec { font-family: var(--font-display); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; font-size: 19px; }
+.queue .chipv { display: inline-block; width: 40px; text-align: center; color: #fff; font-weight: 600; }
+.scorebox { display: flex; align-items: baseline; gap: 18px; }
+.scorebox .big-num { font-family: var(--font-mono); font-weight: 600; font-size: 72px; }
+
+/* ---- knapsack table */
+.dp { border-collapse: collapse; font-family: var(--font-mono); font-size: 21px; }
+.dp td, .dp th { width: 66px; height: 46px; text-align: center; border: 1px solid var(--line-2); transition: background .25s, color .25s; }
+.dp th { font-family: var(--font-display); font-weight: 600; font-size: 18px; color: var(--ink-3); border: 0; }
+.dp td.empty { color: transparent; }
+.dp td.take { background: var(--cache-soft); }
+.dp td.path { background: var(--gain-soft); outline: 3px solid var(--gain); outline-offset: -3px; font-weight: 600; }
+.dp td.rowh { width: auto; text-align: left; padding: 0 14px; border: 0; font-family: var(--font-body); white-space: nowrap; }
+
+/* ---- cartridge strips (a cache drawn as a bar) */
+.strip { position: relative; height: 64px; background: var(--rack); border-radius: 4px; padding: 6px; display: flex; gap: 0; }
+.strip .slot { height: 52px; display: grid; place-items: center; color: #fff; font-family: var(--font-mono); font-weight: 600; font-size: 20px; border-right: 2px solid var(--rack); transition: width .5s var(--ease); overflow: hidden; white-space: nowrap; }
+.strip .waste { height: 52px; background: repeating-linear-gradient(-45deg, transparent 0 8px, rgba(255,255,255,.12) 8px 16px); color: #cfd5da; display: grid; place-items: center; font-size: 18px; }
+
+/* ---- charts */
+.chart text { font-family: var(--font-body); }
+.chart .lab { font-size: 22px; fill: var(--ink); }
+.chart .track { fill: var(--bg-2); }
+.chart .bar { fill: var(--ink-3); transition: width .9s var(--ease); }
+.chart .row.me .bar, .chart .bar.b { fill: var(--fibre); }
+.chart .row.me .lab { font-weight: 600; }
+.chart .row.alt .bar, .chart .bar.a { fill: var(--line); }
+.chart .row.top .bar { fill: var(--dc); }
+.chart .row.ok .bar { fill: var(--pass); }
+.chart .val { font-family: var(--font-mono); font-size: 20px; fill: var(--ink); transition: opacity .4s; }
+.chart .note { font-size: 17px; fill: var(--ink-3); }
+.chart .legend { font-size: 18px; fill: var(--ink-2); }
+.chart .axisnote { font-size: 16px; fill: var(--ink-3); font-style: italic; }
+.chart.heat .colh { font-family: var(--font-display); font-weight: 600; font-size: 22px; fill: var(--ink-2); }
+.chart.heat .colh.me { fill: var(--fibre); }
+.chart.heat .rowh { font-family: var(--font-mono); font-size: 17px; fill: var(--ink-2); }
+.chart.heat .cell { transition: opacity .4s; cursor: default; }
+.chart.heat .cell.best { fill: var(--cache); }
+.chart.heat .cell.v1 { fill: color-mix(in srgb, var(--cache) 55%, var(--bg)); }
+.chart.heat .cell.v2 { fill: color-mix(in srgb, var(--gain) 45%, var(--bg)); }
+.chart.heat .cell.v3 { fill: color-mix(in srgb, var(--fail) 45%, var(--bg)); }
+.chart.heat .cell.v4 { fill: var(--fail); }
+.chart.heat .colframe { fill: none; stroke: var(--fibre); stroke-width: 4; }
+.chart.heat.dimothers .cell { opacity: .25; }
+.chart.heat.dimothers .cell.mine { opacity: 1; }
+
+/* legend chips */
+.legend-row { display: flex; gap: 18px; font-size: 18px; color: var(--ink-2); align-items: center; }
+.legend-row i { display: inline-block; width: 20px; height: 14px; margin-right: 6px; vertical-align: -1px; }
+
+/* ---- cards grid */
+.cards { display: grid; gap: 22px; }
+.cards .card h3 small { font-family: var(--font-body); font-weight: 400; font-size: 19px; text-transform: none; letter-spacing: 0; color: var(--ink-3); margin-left: 8px; }
+.cards .card ul { margin: 6px 0 0; padding-left: 22px; font-size: 22px; line-height: 1.45; color: var(--ink-2); }
+.cards .card li { margin-bottom: 3px; }
+.cards .card li b { color: var(--ink); font-weight: 600; }
+.card.accent { border-top: 5px solid var(--fibre); }
+.card.dcacc { border-top: 5px solid var(--dc); }
+.card.cacc { border-top: 5px solid var(--cache); }
+.card.gacc { border-top: 5px solid var(--gain); }
+.card.pacc { border-top: 5px solid var(--pass); }
+.card.facc { border-top: 5px solid var(--fail); }
+
+/* ---- SWOT */
+.swot { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 20px; height: 100%; }
+.swot .card h3 { font-size: 34px; }
+.swot .card li { font-size: 23px; }
+
+/* ---- pipeline / flow diagram */
+.flow { position: absolute; }
+.flow .node { position: absolute; background: var(--panel); border: 2px solid var(--ink); padding: 12px 16px; box-shadow: var(--shadow); cursor: pointer; pointer-events: auto; transition: background .2s, border-color .2s; }
+.flow .node b { display: block; font-family: var(--font-mono); font-size: 22px; font-weight: 600; }
+.flow .node span { font-size: 18px; color: var(--ink-2); line-height: 1.3; display: block; }
+.flow .node.solver { border-color: var(--fibre); }
+.flow .node.orch { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.flow .node.orch span { color: var(--line); }
+.flow .node.web { border-color: var(--dc); border-style: dashed; }
+.flow .node.sel { background: var(--gain-soft); }
+.flow .node.orch.sel { background: #3a3326; }
+.flow svg path { fill: none; stroke: var(--ink-2); stroke-width: 3; }
+.flow svg path.dash { stroke-dasharray: 8 6; stroke: var(--dc); }
+
+/* ---- promise checklist */
+.promise { display: grid; grid-template-columns: 520px 70px 1fr; align-items: center; gap: 0 18px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.promise .said { font-family: var(--font-paper); font-size: 27px; color: var(--ink-2); }
+.promise .said small { display: block; font-family: var(--font-body); font-size: 18px; color: var(--ink-3); }
+.promise .tick { width: 54px; height: 54px; border-radius: 50%; border: 3px solid var(--pass); color: var(--pass); display: grid; place-items: center; font-size: 30px; font-weight: 700; }
+.promise .did { font-size: 27px; } .promise .did b { font-weight: 600; } .promise .did small { display: block; color: var(--pass); font-family: var(--font-mono); font-size: 20px; margin-top: 2px; }
+
+/* ---- comparison table (generic) */
+.tbl { border-collapse: collapse; font-size: 22px; width: 100%; }
+.tbl th { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: .08em; font-size: 17px; color: var(--ink-3); text-align: left; padding: 8px 12px; border-bottom: 2px solid var(--ink); }
+.tbl td { padding: 9px 12px; border-bottom: 1px solid var(--line-2); }
+.tbl td.n { font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; }
+.tbl tr.me td { background: var(--fibre-soft); font-weight: 600; }
+.tbl th.n { text-align: right; }
+
+/* ---- controls in the playground / live demo */
+.ctrl { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; pointer-events: auto; }
+.ctrl label { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: .08em; font-size: 18px; color: var(--ink-2); display: flex; flex-direction: column; gap: 4px; }
+.ctrl input[type=range] { width: 200px; accent-color: var(--fibre); }
+.ladder { display: flex; flex-direction: column; gap: 12px; }
+.ladder .rung { display: grid; grid-template-columns: 210px 1fr 150px; align-items: center; gap: 14px; }
+.ladder .rung .nm { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; font-size: 22px; }
+.ladder .rung .tr { height: 34px; background: var(--bg-2); position: relative; }
+.ladder .rung .fl { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink-3); transition: width .8s var(--ease); width: 0; }
+.ladder .rung.good .fl { background: var(--pass); }
+.ladder .rung.bad .fl { background: var(--fail); }
+.ladder .rung .v { font-family: var(--font-mono); font-size: 21px; text-align: right; }
+.ladder .opt { position: absolute; top: -6px; bottom: -6px; width: 0; border-left: 3px dashed var(--ink); }
+
+/* ---- title scene */
+.titlecard { position: absolute; left: 72px; top: 120px; width: 900px; }
+.titlecard h1 { font-family: var(--font-display); font-weight: 700; font-size: 150px; line-height: .86; text-transform: uppercase; margin: 14px 0 18px; letter-spacing: -.005em; }
+.titlecard .sub { font-size: 34px; color: var(--ink-2); line-height: 1.3; }
+.titlecard .team { margin-top: 34px; display: flex; gap: 14px; align-items: center; font-size: 26px; }
+.titlecard .team .grp { background: var(--ink); color: var(--bg); font-family: var(--font-display); font-weight: 600; letter-spacing: .1em; padding: 4px 12px; text-transform: uppercase; }
+.overlay-panel { position: absolute; background: color-mix(in srgb, var(--panel) 93%, transparent); border: 1px solid var(--line); box-shadow: var(--shadow); padding: 20px 26px; }
+.legend3d { display: flex; flex-direction: column; gap: 10px; font-size: 21px; }
+.legend3d i { display: inline-block; width: 46px; height: 0; border-top: 5px solid var(--fibre); margin-right: 12px; vertical-align: middle; }
+.legend3d i.dash { border-top: 4px dashed var(--ink-3); }
+
+/* projector-size text (larger than the defaults above) */
+.cards .card ul { font-size: 27px; line-height: 1.42; }
+.cards .card h3 { font-size: 34px; }
+.cards .card .body { font-size: 28px; }
+.swot .card li { font-size: 29px; margin-bottom: 8px; }
+.tbl { font-size: 25px; }
+.promise { padding: 22px 0; }
+.promise .said { font-size: 32px; }
+.promise .did { font-size: 31px; }
+.promise .did small { font-size: 22px; }
+.scene-s15 .tbl { font-size: 27px; }
+.scene-s13 .card .body { font-size: 27px !important; }
+.scene-s17 .card .body { font-size: 24px !important; }

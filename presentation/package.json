@@ -1,0 +1,16 @@
+{
+  "name": "streaming-videos-talk",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Interactive presentation of Group D's Hash Code 2017 Streaming Videos solution",
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "test": "node --test tests/engine.test.mjs",
+    "pdf": "node tools/export-pdf.mjs docs/slides.pdf",
+    "speaker-pdf": "node tools/export-speaker-pdf.mjs docs/speaker-view.pdf",
+    "guide": "node tools/export-guide.mjs docs/team-guide-plain-words.pdf",
+    "shots": "node tools/shots.mjs",
+    "solvers": "node tools/run-solvers.mjs"
+  }
+}
