@@ -136,7 +136,7 @@ so it can tell at once how much a new copy would really help.
 ## 4. Stage 1: greedy
 
 **In one sentence:** keep placing the copy that saves the most time per MB, re-checking its
-value just before placing it, then clean up useless copies and make good trades.
+value just before placing it, then clean up copies nobody uses.
 
 ### One round
 
@@ -149,9 +149,7 @@ value just before placing it, then clean up useless copies and make good trades.
    - **Still worth the same:** place it.
    - **Worth less now:** put it back in the list with its new value.
    - **Worth nothing, or no longer fits:** throw it away.
-4. When the list is empty:
-   - **Evict:** remove copies that became useless.
-   - **Swap:** trade cheap copies for a better video.
+4. When the list is empty, **evict**: remove copies that became useless.
 5. Repeat, up to 5 rounds, or stop earlier when a round changes nothing.
 
 ### The same thing on the example, step by step
@@ -162,7 +160,7 @@ value just before placing it, then clean up useless copies and make good trades.
   cache 1 is worth **0**. Steps 2 and 3 throw those pairs away.
 - The final score is **562,500**, better than the statement's own sample answer (462,500).
 
-### Clean-up 1: evict (throw away copies nobody uses)
+### Clean-up: evict (throw away copies nobody uses)
 
 ![How eviction works](docs/pipeline/06a-evict.svg)
 
@@ -174,38 +172,16 @@ Evict finds such copies and deletes them. The score doesn't change, because nobo
 them. But the space they took is now free, and the next round can fill it with something
 useful.
 
-### Clean-up 2: swap (trade weak copies for a better video)
-
-![How a swap works, step by step](docs/pipeline/06b-swap.svg)
-
-Imagine a full suitcase, and you find something more useful that does not fit. You ask: *if
-I take out the least useful things, is the new item worth more than what I took out?*
-
-That is exactly what swap does for each cache:
-
-1. **Find a video that is not in the cache but would help a lot.** Here, W would save 1500
-   ms, but it needs 60 MB and only 10 MB is free.
-2. **Rank the copies already inside, from least useful to most useful.** Usefulness is
-   counted per MB, because we are trying to free space.
-   - A copy's usefulness is how much longer its users would wait without it. They would fall
-     back to the next best cache, or to the data center.
-   - Here X is the least useful, then Y, then Z.
-3. **Take out the least useful ones, one by one, until W fits.**
-   - Removing X frees 40 MB, which is still not enough.
-   - Removing Y as well frees 70 MB, which is enough.
-4. **Compare what we lose with what we win.**
-   - We lose what X and Y were saving: 900 in total.
-   - We win what W saves: 1500.
-   - We come out 600 ahead, so the trade is made. If we would lose more than we win, nothing
-     changes.
-
-The solver tries this with the 20 most promising outside videos and keeps the best trade.
-Then it looks again, up to 50 trades per cache.
+> **What about swap?** The code also runs a quick "swap" step after evict
+> ([`swapPass`, solver.cpp:330](solver.cpp#L330)): it trades the least useful copies in a
+> cache for one better video. We skip it here, because the re-pack (section 6) does the same
+> job, better: it finds the best possible contents of each cache, and any trade swap could
+> make is one of the fillings it considers.
 
 <details><summary>For the curious: code and cost</summary>
 
 - Fill: [`globalFill`, solver.cpp:261](solver.cpp#L261). Evict:
-  [solver.cpp:312](solver.cpp#L312). Swap: [solver.cpp:330](solver.cpp#L330).
+  [solver.cpp:312](solver.cpp#L312).
 - A cache only looks at videos its own endpoints ask for, never the whole catalogue. That
   keeps a round fast even on `kittens` (13 s in C++).
 
@@ -294,8 +270,8 @@ Instead, the solver fills a table.
   it already holds.
 - The work for one cache grows with the number of videos it considers times the size of the
   cache.
-- Re-pack also covers evict and swap inside one cache: those are just two of the fillings the
-  table considers.
+- Re-pack also covers evict inside one cache (dropping a copy nobody uses is one of the
+  fillings the table considers), and any trade the greedy's swap step could make.
 - Starting from the greedy's answer ends higher than starting from empty caches
   (videos: 610,505 vs 606,631).
 
@@ -354,7 +330,7 @@ exact solver goes all the way to the proven best answer.
 | Stage | Changes at once | Perfect? | Can lower the score? | Fixes |
 |---|---|---|---|---|
 | Greedy | one copy | no | no | builds a good start fast |
-| Evict / swap | a few copies | no | no | useless copies, some bad choices |
+| Evict | a few copies | no | no | copies nobody uses |
 | Re-pack | one whole cache | yes, if the others stay fixed | no | bad combinations inside a cache |
 | LNS | two caches | yes, if the others stay fixed | no | changes that need two caches at once |
 | Exact | everything | yes | — | small data sets: the proven best answer |
@@ -406,7 +382,7 @@ escape being stuck, and add very cheap one-video moves to search with.
   - The best answer seen is saved and put back at the end, so the final result is never worse
     than the best one found.
 - **`--moves S`:** for S seconds, try tiny moves:
-  - **swap** two videos between caches that share users, or
+  - **swap** two videos between caches that share users (not the greedy's swap step), or
   - **replace** one video in a cache by one its users ask for.
 
   Only the requests for those two videos can change, so checking a move is very fast.

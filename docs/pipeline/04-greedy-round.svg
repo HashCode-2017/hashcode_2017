@@ -5,7 +5,7 @@
 <rect x="28" y="20" width="133" height="22" rx="11.0" fill="#ebe8fa" stroke="#6250d6" stroke-width="1.2"/>
 <text x="95" y="35" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">STAGE 1 · GREEDY</text>
 <text x="173" y="39" font-size="20" font-weight="700" fill="#0b0b0b" text-anchor="start">One greedy round</text>
-<text x="28" y="64" font-size="13.5" font-weight="400" fill="#52514e" text-anchor="start">solver.cpp: globalFill → evictDeadWeight → swapPass, up to 5 rounds</text>
+<text x="28" y="64" font-size="13.5" font-weight="400" fill="#52514e" text-anchor="start">solver.cpp: globalFill → evictDeadWeight, up to 5 rounds</text>
 <text x="110" y="92" font-size="14" font-weight="700" fill="#0b0b0b" text-anchor="start">1a · Global fill (lazy max-heap)</text>
 <rect x="110" y="102" width="300" height="58" rx="10" fill="#ebe8fa" stroke="#6250d6" stroke-width="1.5"/>
 <text x="260.0" y="120" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">Score every (cache, video) pair</text>
@@ -57,24 +57,19 @@
 <text x="793.0" y="117" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">1b · Evict dead weight</text>
 <text x="793.0" y="134" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">delete a copy if every endpoint that</text>
 <text x="793.0" y="150" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">wants it gets it as fast elsewhere</text>
-<line x1="793" y1="164" x2="793" y2="192" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
-<rect x="654" y="194" width="278" height="72" rx="10" fill="#ebe8fa" stroke="#6250d6" stroke-width="1.5"/>
-<text x="793.0" y="219" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">1c · Swap</text>
-<text x="793.0" y="236" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">give up the least useful copies for a</text>
-<text x="793.0" y="252" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">better video, if we win more than we lose</text>
-<line x1="793" y1="266" x2="793" y2="292" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
-<polygon points="793,294.0 918.0,340 793,386.0 668.0,340" fill="#f1f0ec" stroke="#52514e" stroke-width="1.5"/>
-<text x="793" y="328" font-size="13" font-weight="600" fill="#0b0b0b" text-anchor="middle">anything changed,</text>
-<text x="793" y="345" font-size="13" font-weight="600" fill="#0b0b0b" text-anchor="middle">round &lt; 5 and</text>
-<text x="793" y="362" font-size="13" font-weight="600" fill="#0b0b0b" text-anchor="middle">time left?</text>
-<path d="M918,340 H944 V74 H395 V100" fill="none" stroke="#52514e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#m-ink)"/>
-<text x="924" y="332" font-size="12" font-weight="600" fill="#52514e" text-anchor="start">yes</text>
+<line x1="793" y1="164" x2="793" y2="190" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
+<polygon points="793,192.0 918.0,238 793,284.0 668.0,238" fill="#f1f0ec" stroke="#52514e" stroke-width="1.5"/>
+<text x="793" y="226" font-size="13" font-weight="600" fill="#0b0b0b" text-anchor="middle">anything changed,</text>
+<text x="793" y="243" font-size="13" font-weight="600" fill="#0b0b0b" text-anchor="middle">round &lt; 5 and</text>
+<text x="793" y="260" font-size="13" font-weight="600" fill="#0b0b0b" text-anchor="middle">time left?</text>
+<path d="M918,238 H944 V74 H395 V100" fill="none" stroke="#52514e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#m-ink)"/>
+<text x="924" y="230" font-size="12" font-weight="600" fill="#52514e" text-anchor="start">yes</text>
 <text x="600" y="70" font-size="12" font-weight="600" fill="#52514e" text-anchor="middle">next round</text>
-<line x1="793" y1="386" x2="793" y2="414" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
-<text x="801" y="406" font-size="12" font-weight="600" fill="#52514e" text-anchor="start">no</text>
-<rect x="674" y="416" width="238" height="46" rx="10" fill="#dcf3ea" stroke="#1baf7a" stroke-width="1.5"/>
-<text x="793.0" y="436" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">Greedy done</text>
-<text x="793.0" y="453" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">→ stage 2, the re-pack</text>
+<line x1="793" y1="284" x2="793" y2="312" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
+<text x="801" y="304" font-size="12" font-weight="600" fill="#52514e" text-anchor="start">no</text>
+<rect x="674" y="314" width="238" height="46" rx="10" fill="#dcf3ea" stroke="#1baf7a" stroke-width="1.5"/>
+<text x="793.0" y="334" font-size="14" font-weight="650" fill="#0b0b0b" text-anchor="middle">Greedy done</text>
+<text x="793.0" y="351" font-size="12" font-weight="400" fill="#52514e" text-anchor="middle">→ stage 2, the re-pack</text>
 <rect x="640" y="490" width="292" height="112" rx="10" fill="#f1f0ec"/>
 <text x="656" y="514" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">Why “lazy” is safe: placing a copy can</text>
 <text x="656" y="533" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">only make other pairs worth less, never</text>

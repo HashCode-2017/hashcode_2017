@@ -87,7 +87,7 @@
 <text x="590" y="542" font-size="13.5" font-weight="400" fill="#52514e" text-anchor="end">1000 ms</text>
 <rect x="630" y="426" width="284" height="120" rx="10" fill="#dcf3ea" stroke="#1baf7a" stroke-width="1.5"/>
 <text x="646" y="450" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">Why also keep the next best?</text>
-<text x="646" y="468" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">Swap and re-pack keep asking “if this</text>
+<text x="646" y="468" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">Evict and re-pack keep asking “if this</text>
 <text x="646" y="486" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">copy were removed, how slow would it</text>
 <text x="646" y="504" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">get?” The answer is just the next best,</text>
 <text x="646" y="522" font-size="12.5" font-weight="400" fill="#0b0b0b" text-anchor="start">no searching needed.</text>

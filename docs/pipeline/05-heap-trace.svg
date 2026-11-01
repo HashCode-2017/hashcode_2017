@@ -78,7 +78,7 @@
 <text x="816" y="358" font-size="12" font-weight="400" fill="#8a8984" text-anchor="start" font-style="italic">too big</text>
 <text x="816" y="380" font-size="12" font-weight="400" fill="#8a8984" text-anchor="start" font-style="italic">no cache</text>
 <rect x="28" y="404" width="904" height="92" rx="10" fill="#f1f0ec"/>
-<text x="46" y="430" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="start">Evict: nothing to delete. Swap: v4 would be worth 450,000 in c0 but can never fit. Round 2 changes nothing → stop.</text>
+<text x="46" y="430" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="start">Evict: nothing to delete. Round 2 changes nothing → stop.</text>
 <text x="46" y="460" font-size="14.5" font-weight="600" fill="#0b0b0b" text-anchor="start">saving = 1500 × 900 + 1000 × 900 = 2,250,000</text>
 <text x="46" y="484" font-size="14.5" font-weight="700" fill="#0b0b0b" text-anchor="start">score = 2,250,000 × 1000 ÷ 4000 = 562,500</text>
 <text x="912" y="484" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="end">statement&#x27;s sample answer: 462,500</text>

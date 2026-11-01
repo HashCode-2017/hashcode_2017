@@ -22,7 +22,7 @@
 <text x="90" y="356" font-size="13.5" font-weight="700" fill="#0b0b0b" text-anchor="start">Branch 1 · solver.cpp --lns</text>
 <rect x="100" y="370" width="300" height="50" rx="10" fill="#ebe8fa" stroke="#6250d6" stroke-width="1.5"/>
 <text x="250.0" y="392" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">1 · Greedy</text>
-<text x="250.0" y="410" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="middle">≤ 5 rounds of fill · evict · swap</text>
+<text x="250.0" y="410" font-size="12.5" font-weight="400" fill="#52514e" text-anchor="middle">≤ 5 rounds of fill · evict</text>
 <line x1="250" y1="420" x2="250" y2="436" stroke="#52514e" stroke-width="1.5" marker-end="url(#m-ink)"/>
 <rect x="100" y="438" width="300" height="50" rx="10" fill="#dcf3ea" stroke="#1baf7a" stroke-width="1.5"/>
 <text x="250.0" y="460" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">2 · Exact re-pack</text>

@@ -247,7 +247,7 @@ def fig_overview():
     # branch 1
     b.append(R(70, 332, 360, 300, SURF, "#c9c8c2", rx=14, dash="5 4"))
     b.append(T(90, 356, "Branch 1 · solver.cpp --lns", 13.5, 700))
-    b.append(node(100, 370, 300, 50, "1 · Greedy", ["≤ 5 rounds of fill · evict · swap"], VIOLET_T, VIOLET))
+    b.append(node(100, 370, 300, 50, "1 · Greedy", ["≤ 5 rounds of fill · evict"], VIOLET_T, VIOLET))
     b.append(L(250, 420, 250, 436))
     b.append(node(100, 438, 300, 50, "2 · Exact re-pack", ["one cache at a time, until stable"], AQUA_T, AQUA))
     b.append(L(250, 488, 250, 504))
@@ -347,7 +347,7 @@ def fig_bookkeeping():
         b.append(T(590, y, nxt, 13.5, anchor="end", fill=INK2))
     b.append(R(630, 426, 284, 120, AQUA_T, AQUA, rx=10))
     b.append(lines(646, 450, ["Why also keep the next best?",
-                              "Swap and re-pack keep asking “if this",
+                              "Evict and re-pack keep asking “if this",
                               "copy were removed, how slow would it",
                               "get?” The answer is just the next best,", "no searching needed."], 12.5, lh=18))
     b.append(lines(46, 584, ["When a copy is placed, “best now” drops for the requests it speeds up.",
@@ -358,7 +358,7 @@ def fig_bookkeeping():
 # ------------------------------------------------------------------ 04 greedy round
 
 def fig_greedy_round():
-    b = heading("One greedy round", "solver.cpp: globalFill → evictDeadWeight → swapPass, up to 5 rounds",
+    b = heading("One greedy round", "solver.cpp: globalFill → evictDeadWeight, up to 5 rounds",
                 stage=GREEDY)
     cx = 260
     b.append(T(110, 92, "1a · Global fill (lazy max-heap)", 14, 700, fill=INK))
@@ -401,18 +401,14 @@ def fig_greedy_round():
     b.append(node(654, 92, 278, 72, "1b · Evict dead weight",
                   ["delete a copy if every endpoint that", "wants it gets it as fast elsewhere"], VIOLET_T,
                   VIOLET, size=14, sub_size=12))
-    b.append(L(793, 164, 793, 192))
-    b.append(node(654, 194, 278, 72, "1c · Swap",
-                  ["give up the least useful copies for a", "better video, if we win more than we lose"], VIOLET_T,
-                  VIOLET, size=14, sub_size=12))
-    b.append(L(793, 266, 793, 292))
-    b.append(diamond(793, 340, 250, 92, ["anything changed,", "round < 5 and", "time left?"]))
-    b.append(P("M918,340 H944 V74 H395 V100"))
-    b.append(T(924, 332, "yes", 12, 600, fill=INK2))
+    b.append(L(793, 164, 793, 190))
+    b.append(diamond(793, 238, 250, 92, ["anything changed,", "round < 5 and", "time left?"]))
+    b.append(P("M918,238 H944 V74 H395 V100"))
+    b.append(T(924, 230, "yes", 12, 600, fill=INK2))
     b.append(T(600, 70, "next round", 12, 600, fill=INK2, anchor="middle"))
-    b.append(L(793, 386, 793, 414))
-    b.append(T(801, 406, "no", 12, 600, fill=INK2))
-    b.append(node(674, 416, 238, 46, "Greedy done", ["→ stage 2, the re-pack"], AQUA_T, AQUA, size=14,
+    b.append(L(793, 284, 793, 312))
+    b.append(T(801, 304, "no", 12, 600, fill=INK2))
+    b.append(node(674, 314, 238, 46, "Greedy done", ["→ stage 2, the re-pack"], AQUA_T, AQUA, size=14,
                   sub_size=12))
 
     b.append(R(640, 490, 292, 112, GRAY_T, None, rx=10))
@@ -479,7 +475,7 @@ def fig_heap_trace():
     b.append(T(x0 + 200, 380, "no cache", 12, fill=MUTED, italic=True))
 
     b.append(R(28, 404, 904, 92, GRAY_T, None, rx=10))
-    b.append(lines(46, 430, ["Evict: nothing to delete. Swap: v4 would be worth 450,000 in c0 but can never fit. "
+    b.append(lines(46, 430, ["Evict: nothing to delete. "
                              "Round 2 changes nothing → stop.",
                              ],
                    12.5, fill=INK2))
@@ -489,7 +485,7 @@ def fig_heap_trace():
     save("05-heap-trace.svg", 960, 516, "Trace of the greedy fill on example.in", b)
 
 
-# ------------------------------------------------------------------ 06 evict & swap
+# ------------------------------------------------------------------ 06 evict
 
 def fig_evict():
     b = heading("Evict: delete copies that nobody uses", stage=GREEDY)
@@ -519,68 +515,6 @@ def fig_evict():
                "least as fast from somewhere else.", 12.5, 600, fill=INK2))
     save("06a-evict.svg", 960, 352, "How eviction works", b)
 
-
-def fig_swap():
-    b = heading("Swap: make room for a better video, if the trade pays off",
-                "The cache is full, but a video outside would help a lot. Is it worth throwing something out?",
-                stage=GREEDY)
-    sc, bx = 3.6, 520
-
-    def bar(y, segs):
-        out, x = [], bx
-        for lab, mb, fill, txt, stroke in segs:
-            out.append(R(x, y, mb * sc - 2, 32, fill, stroke, rx=4, sw=1))
-            out.append(T(x + mb * sc / 2, y + 21, lab, 12, 700, fill=txt, anchor="middle"))
-            x += mb * sc
-        return out
-
-    X = ("X saves 300", 30, BLUE, "#ffffff", None)
-    Y = ("Y saves 600", 30, BLUE, "#ffffff", None)
-    Z = ("Z saves 1800", 30, BLUE, "#ffffff", None)
-    F10 = ("free", 10, GRAY_T, INK2, "#c9c8c2")
-
-    def step(y, n, title, ls):
-        out = [f'<circle cx="58" cy="{y + 6}" r="14" fill="{VIOLET_T}" stroke="{VIOLET}" stroke-width="1.5"/>',
-               T(58, y + 11, n, 14, 700, anchor="middle"), T(84, y + 11, title, 15, 700)]
-        out.append(lines(84, y + 34, ls, 12.5, lh=19, fill=INK2))
-        return out
-
-    y = 92
-    b += step(y, "1", "The cache is full", ["The cache (100 MB) holds X, Y and Z, 30 MB each,",
-                                            "and only 10 MB is free. Video W needs 60 MB and",
-                                            "would save 1500 ms, but it does not fit."])
-    b += bar(y - 4, [X, Y, Z, F10])
-    b.append(R(bx, y + 38, 60 * sc - 2, 28, VIOLET_T, VIOLET, rx=4, sw=1.2))
-    b.append(T(bx + 30 * sc, y + 57, "W · 60 MB · would save 1500", 12, 700, anchor="middle"))
-    b.append(T(bx + 60 * sc + 10, y + 57, "← waiting outside", 12, fill=INK2))
-
-    y = 214
-    b += step(y, "2", "Rank the copies: who is least useful?", ["Per MB, X saves the least, then Y, then Z.",
-                                                               "The least useful copies are the first ones",
-                                                               "we would give up."])
-    b += bar(y - 4, [X, Y, Z, F10])
-    for i, lab in enumerate(["1st to go", "2nd to go", "keep"]):
-        b.append(T(bx + (i * 30 + 15) * sc, y + 46, lab, 12, 600, fill=RED if i < 2 else INK2, anchor="middle"))
-
-    y = 320
-    b += step(y, "3", "Make room, least useful first", ["Remove X: 40 MB free, still too small for W.",
-                                                       "Remove Y too: 70 MB free, now W fits."])
-    b += bar(y - 4, [("X out", 30, "url(#hatch)", RED, RED), ("Y out", 30, "url(#hatch)", RED, RED), Z, F10])
-
-    y = 414
-    b += step(y, "4", "Is the trade worth it?", ["We lose what X and Y saved: 300 + 600 = 900.",
-                                                "We win what W saves: 1500.",
-                                                "1500 is more than 900, so we are 600 better: swap!"])
-    b += bar(y - 4, [Z, ("W saves 1500", 60, GREEN, "#ffffff", None), F10])
-    b.append(T(bx, y + 52, "after the swap", 12, 600, fill=GREEN))
-
-    b.append(R(28, 512, 904, 84, GRAY_T, None, rx=10))
-    b.append(lines(46, 536, ["If we would lose more than we win, nothing changes.",
-                             "“X saves 300” means: without this copy, X's users would wait 300 ms more in total "
-                             "(they fall back to the next best cache or the data center).",
-                             "For each cache the solver tries the 20 most valuable videos it does not hold, makes "
-                             "the best trade, then looks again (at most 50 trades per cache)."], 12.5, lh=20))
-    save("06b-swap.svg", 960, 616, "How a swap works, step by step", b)
 
 
 # ------------------------------------------------------------------ 07 ratio trap
@@ -1052,7 +986,7 @@ def fig_commit_annealing():
 
 
 if __name__ == "__main__":
-    for f in [fig_problem, fig_overview, fig_bookkeeping, fig_greedy_round, fig_heap_trace, fig_evict, fig_swap,
+    for f in [fig_problem, fig_overview, fig_bookkeeping, fig_greedy_round, fig_heap_trace, fig_evict,
               fig_ratio_trap, fig_repack_value, fig_repack_steps, fig_knapsack, fig_lns, fig_milp, fig_scores, fig_summary,
               fig_commit_gcd, fig_commit_annealing]:
         f()
