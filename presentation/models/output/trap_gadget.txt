@@ -1,0 +1,38 @@
+$ python solution.py trap_gadget.in trap_gadget.out
+=== STORED IN CACHES: 1 of 2 caches used, 100 of 200 MB filled
+    c0:    100/100 MB,    2 videos  v0 v1
+    c1:      0/100 MB,    0 videos  (empty)
+    | 1
+    | 0 0 1
+
+=== SCORE
+  requests: 4,002, served from a cache: 2,002 (50.0%)
+  score: 499,749
+
+$ solver trap_gadget.in trap_gadget.out --repack
+trap_gadget.in: V=4 E=2 R=4 C=2 X=100 (0.0s)
+  round 1: 2 placed, 0 evicted, 0 swaps -> 499749
+  round 2: 0 placed, 0 evicted, 0 swaps -> 499749
+greedy: 499749 (0.0s)
+  re-pack sweep +0 pts -> 499749
+re-pack: 499749 (0.0s)
+final 499749 (0.0s)
+
+$ solver trap_gadget.in trap_gadget.out --lns 3
+trap_gadget.in: V=4 E=2 R=4 C=2 X=100 (0.0s)
+  round 1: 2 placed, 0 evicted, 0 swaps -> 499749
+  round 2: 0 placed, 0 evicted, 0 swaps -> 499749
+greedy: 499749 (0.0s)
+  re-pack sweep +0 pts -> 499749
+re-pack: 499749 (0.0s)
+  lns score 499749
+  lns score 998499
+lns + re-pack: 998499 (3.0s)
+final 998499 (3.0s)
+
+$ python exact.py trap_gadget.in trap_gadget.out --time-limit 30
+6 x vars, 6 y vars
+status: Optimization terminated successfully. (HiGHS Status 7: Optimal)
+score 998,499
+upper bound 998,499
+0s
