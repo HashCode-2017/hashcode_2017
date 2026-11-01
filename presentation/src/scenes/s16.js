@@ -21,6 +21,7 @@ export default {
           <div class="eyebrow">Each layer, on this instance</div>
           <div class="ladder" style="margin-top:14px"></div>
           <div class="body view" style="margin-top:24px;font-size:22px"></div>
+          <div class="small" style="margin-top:10px">Point at an endpoint, a cache or the data center to see only its links and their latencies.</div>
           <div class="ctrl" style="margin-top:16px">${['greedy', 'repack', 'lns', 'optimum'].map(k => `<button class="btn" data-show="${k}">${k === 'repack' ? 're-pack' : k === 'lns' ? 'LNS' : k}</button>`).join('')}</div>
         </div>
       </div>`;
@@ -41,7 +42,7 @@ export default {
     const o = optimum(inst, 300000);
     this.res = { greedy: [g.placed, g.score], repack: [r, rs], lns: [l, ls], optimum: o ? [o.placed, o.score] : null };
     const wrap = this.root.querySelector('.netwrap'); wrap.innerHTML = '';
-    this.netv = drawNetwork(wrap, inst, { W: 1140, H: 780, cacheW: 250 });
+    this.netv = drawNetwork(wrap, inst, { W: 1140, H: 780, cacheW: 250, interactive: true });
     const top = o ? o.score : ls;
     const rows = [['Greedy', g.score], ['+ Re-pack', rs], ['+ LNS', ls], ['Optimum', o ? o.score : null]];
     this.root.querySelector('.ladder').innerHTML = rows.map(([nm, v]) => `<div class="rung ${v != null && v >= top ? 'good' : ''}"><span class="nm">${nm}</span><span class="tr"><span class="fl" style="width:${v == null ? 0 : v / Math.max(1, top) * 100}%"></span></span><span class="v">${v == null ? 'too big' : fmt(v)}</span></div>`).join('');

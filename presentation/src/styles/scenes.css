@@ -36,6 +36,13 @@
 .net .link.dc path { stroke: var(--ink-3); stroke-dasharray: 10 8; opacity: .6; stroke-width: 3; }
 .net .link.hot path { opacity: 1; stroke-width: 6; }
 .net .link .lat { font-family: var(--font-mono); font-size: 17px; fill: var(--ink-2); paint-order: stroke; stroke: var(--bg); stroke-width: 6px; }
+.net.quiet .link .lat { opacity: 0; transition: opacity .2s; }
+.net .link { transition: opacity .2s; }
+.net.focusing .link { opacity: .08; }
+.net.focusing .link.sel { opacity: 1; }
+.net.focusing .link.sel path { opacity: 1; stroke-width: 6; }
+.net.focusing .link.sel .lat { opacity: 1; font-weight: 600; }
+.net.quiet .epnode, .net.quiet .cachenode, .net.quiet .dcnode { cursor: pointer; }
 .net .ghost rect { stroke: var(--gain); stroke-width: 3; stroke-dasharray: 6 4; }
 .net .ghost.drop rect { stroke: var(--fail); opacity: .55; }
 .net .cart rect { transition: opacity .3s; }

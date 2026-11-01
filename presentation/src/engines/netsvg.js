@@ -4,7 +4,7 @@
 import { svg, text, vcol, fmt } from './dom.js';
 import { bestLatency, used } from '../solver/engine.js';
 
-export function drawNetwork(parent, inst, { W = 1100, H = 720, names = {}, cacheW = 250 } = {}) {
+export function drawNetwork(parent, inst, { W = 1100, H = 720, names = {}, cacheW = 250, interactive = false } = {}) {
   const s = svg('svg', { class: 'net', width: W, height: H, viewBox: `0 0 ${W} ${H}` }, parent);
   const gLinks = svg('g', {}, s), gNodes = svg('g', {}, s);
   const cn = c => names.cache?.[c] ?? `Cache ${c}`;
@@ -12,37 +12,25 @@ export function drawNetwork(parent, inst, { W = 1100, H = 720, names = {}, cache
   const vn = v => names.video?.[v] ?? `v${v}`;
 
   const dc = { x: 20, y: H / 2 - 90, w: 150, h: 180 };
-  // endpoint cards: one column if they fit, otherwise two narrower columns with tighter rows
+  // endpoint cards stay in one column (so every link stays visible). When the rows don't fit,
+  // each card lists its requests as chips, 2 or 3 per line.
   const rowsOf = e => inst.byEndpoint[e].length;
   const head = 60; // card header + bottom padding
-  const oneColH = rh => [...Array(inst.E).keys()].reduce((a, e) => a + head + rowsOf(e) * rh, 0) + (inst.E + 1) * 16;
-  let cols = 1, rowH = 38, cardW = 370;
-  if (oneColH(38) > H) {
-    if (oneColH(30) <= H) rowH = 30;
-    else { cols = 2; cardW = 312; }
+  const fitsWith = (k, rh) => [...Array(inst.E).keys()].reduce((a, e) => a + head + Math.ceil(rowsOf(e) / k) * rh, 0) + (inst.E + 1) * 12 <= H;
+  let per = 1, rowH = 38, cardW = 370;
+  if (!fitsWith(1, 38)) {
+    if (fitsWith(1, 30)) rowH = 30;
+    else if (fitsWith(2, 32)) { per = 2; rowH = 32; cardW = 440; }
+    else { per = 3; rowH = Math.max(26, Math.min(32, Math.floor((H - (inst.E + 1) * 12 - inst.E * head) / [...Array(inst.E).keys()].reduce((a, e) => a + Math.ceil(rowsOf(e) / 3), 0)))); cardW = 600; }
   }
-  const colOf = [], colH = Array(cols).fill(0);
-  // in order: the first endpoints go left until about half the rows, the rest go right
-  const allRows = [...Array(inst.E).keys()].reduce((a, e) => a + rowsOf(e), 0);
-  for (let e = 0, acc = 0; e < inst.E; e++) {
-    const c = cols === 1 || e === 0 || (acc + rowsOf(e) / 2 <= allRows / 2 && colH[1] === 0) ? 0 : 1;
-    colOf[e] = c; colH[c] += rowsOf(e); acc += rowsOf(e);
-  }
-  if (cols === 2) {
-    rowH = Math.max(24, Math.min(36, Math.floor(Math.min(...colH.map((n, c) => n ? (H - 16 * (colOf.filter(x => x === c).length + 1) - head * colOf.filter(x => x === c).length) / n : 99)))));
-  }
-  const cacheX = cols === 1 ? W * 0.36 : 200, cW = cols === 1 ? cacheW : Math.min(cacheW, 215);
-  if (cols === 2) s.classList.add('compact');
+  if (per > 1) s.classList.add('compact');
+  const cacheX = per === 1 ? W * 0.36 : Math.min(W * 0.36, W - cardW - 300), cW = per === 1 ? cacheW : Math.min(cacheW, 215);
   const cH = Math.min(150, (H - 40) / inst.C - 24);
   const caches = [...Array(inst.C).keys()].map(c => ({ x: cacheX, y: 20 + c * ((H - 40) / inst.C) + ((H - 40) / inst.C - cH) / 2, w: cW, h: cH }));
-  const eps = [...Array(inst.E).keys()].map(e => {
-    const n = rowsOf(e);
-    return { x: W - (cols - colOf[e]) * (cardW + 10) + 10, w: cardW, h: head + n * rowH, n, col: colOf[e] };
-  });
-  for (let c = 0; c < cols; c++) {
-    const mine = eps.filter(ep => ep.col === c);
-    const totalH = mine.reduce((a, b) => a + b.h, 0), gap = Math.max(12, (H - totalH) / (mine.length + 1));
-    let y = gap; mine.forEach(ep => { ep.y = y; y += ep.h + gap; });
+  const eps = [...Array(inst.E).keys()].map(e => ({ x: W - cardW, w: cardW, h: head + Math.ceil(rowsOf(e) / per) * rowH, n: rowsOf(e) }));
+  {
+    const totalH = eps.reduce((a, b) => a + b.h, 0), gap = Math.max(12, (H - totalH) / (inst.E + 1));
+    let y = gap; eps.forEach(ep => { ep.y = y; y += ep.h + gap; });
   }
 
   // links
@@ -52,6 +40,7 @@ export function drawNetwork(parent, inst, { W = 1100, H = 720, names = {}, cache
     const mx = (x1 + x2) / 2;
     const p = svg('path', { d: `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}` }, g);
     const tx = text(g, mx, (y1 + y2) / 2 - 8, `${ms} ms`, { 'text-anchor': 'middle', class: 'lat' });
+    g.dataset.e = e; g.dataset.s = server;
     links[`${e}:${server}`] = { g, p, tx };
   };
   eps.forEach((ep, e) => {
@@ -85,17 +74,32 @@ export function drawNetwork(parent, inst, { W = 1100, H = 720, names = {}, cache
     svg('rect', { class: 'epbox', x: ep.x, y: ep.y, width: ep.w, height: ep.h, rx: 6 }, g);
     text(g, ep.x + 16, ep.y + 34, en(e), { class: 'nlabel' });
     text(g, ep.x + ep.w - 16, ep.y + 34, inst.links[e].length ? `${inst.links[e].length} cache${inst.links[e].length > 1 ? 's' : ''}` : 'no cache', { 'text-anchor': 'end', class: 'nsub' });
+    const chipW = (ep.w - 28) / per;
     const rows = inst.byEndpoint[e].map((r, i) => {
-      const cy = ep.y + 46 + rowH * (i + 0.5), yy = cy + 8, bh = Math.min(28, rowH - 4);
+      const line = Math.floor(i / per), col = i % per;
+      const cy = ep.y + 46 + rowH * (line + 0.5), yy = cy + 8, bh = Math.min(28, rowH - 4);
+      const x0 = ep.x + 14 + col * chipW, bw = per === 1 ? 54 : 42;
       const rg = svg('g', { class: 'req' }, g);
-      svg('rect', { x: ep.x + 14, y: cy - bh / 2, width: cols === 1 ? 54 : 46, height: bh, fill: vcol(r.v), rx: 2 }, rg);
-      text(rg, ep.x + (cols === 1 ? 41 : 37), yy - 2, vn(r.v), { 'text-anchor': 'middle', class: 'vlabel' });
-      text(rg, ep.x + (cols === 1 ? 80 : 70), yy - 2, `×${fmt(r.n)}`, { class: 'rq' });
-      const served = text(rg, ep.x + ep.w - (cols === 1 ? 16 : 12), yy - 2, '', { 'text-anchor': 'end', class: 'served' });
+      svg('rect', { x: x0, y: cy - bh / 2, width: bw, height: bh, fill: vcol(r.v), rx: 2 }, rg);
+      text(rg, x0 + bw / 2, yy - 2, vn(r.v), { 'text-anchor': 'middle', class: 'vlabel' });
+      text(rg, x0 + bw + (per === 1 ? 12 : 6), yy - 2, `×${fmt(r.n)}`, { class: 'rq' });
+      const served = text(rg, per === 1 ? ep.x + ep.w - 16 : x0 + chipW - 10, yy - 2, '', { 'text-anchor': 'end', class: 'served' });
       return { r, served };
     });
     return { g, rows };
   });
+
+  // playground: latency labels stay hidden; pointing at an endpoint or a cache shows only its links
+  if (interactive) {
+    s.classList.add('quiet');
+    const focus = pick => {
+      s.classList.toggle('focusing', !!pick);
+      s.querySelectorAll('.link').forEach(l => l.classList.toggle('sel', !!pick && pick(l.dataset)));
+    };
+    epEls.forEach((ee, e) => { ee.g.addEventListener('mouseenter', () => focus(d => d.e == e)); ee.g.addEventListener('mouseleave', () => focus(null)); });
+    cacheEls.forEach((ce, c) => { ce.g.addEventListener('mouseenter', () => focus(d => d.s == c)); ce.g.addEventListener('mouseleave', () => focus(null)); });
+    gdc.addEventListener('mouseenter', () => focus(d => d.s === 'dc')); gdc.addEventListener('mouseleave', () => focus(null));
+  }
 
   function set(placed, { show = true } = {}) {
     cacheEls.forEach((ce, c) => {
@@ -115,7 +119,7 @@ export function drawNetwork(parent, inst, { W = 1100, H = 720, names = {}, cache
       const best = bestLatency(inst, placed, r.e, r.v);
       let from = 'dc';
       for (const [c, L] of inst.links[r.e]) if (L === best && placed[c].has(r.v)) { from = c; break; }
-      served.textContent = show ? (from === 'dc' ? `DC · ${best} ms` : `${cn(from).toLowerCase()} · ${best} ms`) : '';
+      served.textContent = !show ? '' : per > 1 ? (from === 'dc' ? `DC ${best}` : `C${from} ${best}`) : (from === 'dc' ? `DC · ${best} ms` : `${cn(from).toLowerCase()} · ${best} ms`);
       served.setAttribute('class', 'served ' + (from === 'dc' ? 'slow' : 'fast'));
       if (show && from !== 'dc') links[`${e}:${from}`]?.g.classList.add('hot');
     }));
