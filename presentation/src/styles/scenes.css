@@ -29,6 +29,7 @@
 .net .vlabel { font-family: var(--font-mono); font-size: 17px; font-weight: 600; fill: #fff; }
 .net .rq { font-family: var(--font-mono); font-size: 19px; fill: var(--ink-2); }
 .net .served { font-family: var(--font-mono); font-size: 17px; }
+.net.compact .served { font-size: 15px; } .net.compact .rq { font-size: 17px; }
 .net .served.fast { fill: var(--cache); } .net .served.slow { fill: var(--ink-3); }
 .net .link path { fill: none; stroke-width: 4; transition: stroke .3s, stroke-width .3s, opacity .3s; }
 .net .link.cache path { stroke: var(--fibre); opacity: .45; }

@@ -12,15 +12,38 @@ export function drawNetwork(parent, inst, { W = 1100, H = 720, names = {}, cache
   const vn = v => names.video?.[v] ?? `v${v}`;
 
   const dc = { x: 20, y: H / 2 - 90, w: 150, h: 180 };
+  // endpoint cards: one column if they fit, otherwise two narrower columns with tighter rows
+  const rowsOf = e => inst.byEndpoint[e].length;
+  const head = 60; // card header + bottom padding
+  const oneColH = rh => [...Array(inst.E).keys()].reduce((a, e) => a + head + rowsOf(e) * rh, 0) + (inst.E + 1) * 16;
+  let cols = 1, rowH = 38, cardW = 370;
+  if (oneColH(38) > H) {
+    if (oneColH(30) <= H) rowH = 30;
+    else { cols = 2; cardW = 312; }
+  }
+  const colOf = [], colH = Array(cols).fill(0);
+  // in order: the first endpoints go left until about half the rows, the rest go right
+  const allRows = [...Array(inst.E).keys()].reduce((a, e) => a + rowsOf(e), 0);
+  for (let e = 0, acc = 0; e < inst.E; e++) {
+    const c = cols === 1 || e === 0 || (acc + rowsOf(e) / 2 <= allRows / 2 && colH[1] === 0) ? 0 : 1;
+    colOf[e] = c; colH[c] += rowsOf(e); acc += rowsOf(e);
+  }
+  if (cols === 2) {
+    rowH = Math.max(24, Math.min(36, Math.floor(Math.min(...colH.map((n, c) => n ? (H - 16 * (colOf.filter(x => x === c).length + 1) - head * colOf.filter(x => x === c).length) / n : 99)))));
+  }
+  const cacheX = cols === 1 ? W * 0.36 : 200, cW = cols === 1 ? cacheW : Math.min(cacheW, 215);
+  if (cols === 2) s.classList.add('compact');
   const cH = Math.min(150, (H - 40) / inst.C - 24);
-  const caches = [...Array(inst.C).keys()].map(c => ({ x: W * 0.36, y: 20 + c * ((H - 40) / inst.C) + ((H - 40) / inst.C - cH) / 2, w: cacheW, h: cH }));
+  const caches = [...Array(inst.C).keys()].map(c => ({ x: cacheX, y: 20 + c * ((H - 40) / inst.C) + ((H - 40) / inst.C - cH) / 2, w: cW, h: cH }));
   const eps = [...Array(inst.E).keys()].map(e => {
-    const n = inst.byEndpoint[e].length;
-    const h = 64 + n * 38;
-    return { x: W - 370, w: 370, h, n };
+    const n = rowsOf(e);
+    return { x: W - (cols - colOf[e]) * (cardW + 10) + 10, w: cardW, h: head + n * rowH, n, col: colOf[e] };
   });
-  const totalH = eps.reduce((a, b) => a + b.h, 0), gap = Math.max(16, (H - totalH) / (inst.E + 1));
-  let y = gap; eps.forEach(ep => { ep.y = y; y += ep.h + gap; });
+  for (let c = 0; c < cols; c++) {
+    const mine = eps.filter(ep => ep.col === c);
+    const totalH = mine.reduce((a, b) => a + b.h, 0), gap = Math.max(12, (H - totalH) / (mine.length + 1));
+    let y = gap; mine.forEach(ep => { ep.y = y; y += ep.h + gap; });
+  }
 
   // links
   const links = {};
@@ -63,12 +86,12 @@ export function drawNetwork(parent, inst, { W = 1100, H = 720, names = {}, cache
     text(g, ep.x + 16, ep.y + 34, en(e), { class: 'nlabel' });
     text(g, ep.x + ep.w - 16, ep.y + 34, inst.links[e].length ? `${inst.links[e].length} cache${inst.links[e].length > 1 ? 's' : ''}` : 'no cache', { 'text-anchor': 'end', class: 'nsub' });
     const rows = inst.byEndpoint[e].map((r, i) => {
-      const yy = ep.y + 66 + i * 38;
+      const cy = ep.y + 46 + rowH * (i + 0.5), yy = cy + 8, bh = Math.min(28, rowH - 4);
       const rg = svg('g', { class: 'req' }, g);
-      svg('rect', { x: ep.x + 14, y: yy - 22, width: 54, height: 28, fill: vcol(r.v), rx: 2 }, rg);
-      text(rg, ep.x + 41, yy - 2, vn(r.v), { 'text-anchor': 'middle', class: 'vlabel' });
-      text(rg, ep.x + 80, yy - 2, `×${fmt(r.n)}`, { class: 'rq' });
-      const served = text(rg, ep.x + ep.w - 16, yy - 2, '', { 'text-anchor': 'end', class: 'served' });
+      svg('rect', { x: ep.x + 14, y: cy - bh / 2, width: cols === 1 ? 54 : 46, height: bh, fill: vcol(r.v), rx: 2 }, rg);
+      text(rg, ep.x + (cols === 1 ? 41 : 37), yy - 2, vn(r.v), { 'text-anchor': 'middle', class: 'vlabel' });
+      text(rg, ep.x + (cols === 1 ? 80 : 70), yy - 2, `×${fmt(r.n)}`, { class: 'rq' });
+      const served = text(rg, ep.x + ep.w - (cols === 1 ? 16 : 12), yy - 2, '', { 'text-anchor': 'end', class: 'served' });
       return { r, served };
     });
     return { g, rows };
